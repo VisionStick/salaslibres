@@ -93,7 +93,7 @@ function prepararOpciones() {
   opcion(duracion, 0, 'Cualquier duración');
   for (const bloque of horario.bloques) {
     const n = bloque.numero;
-    opcion(duracion, n, n === 1 ? '1 bloque (35 min)' : n + ' bloques completos');
+    opcion(duracion, n, n === 1 ? '1 bloque (35 min)' : n + ' bloques');
   }
 
   for (const [clave, referencia] of Object.entries(datos.referencias)) opcion(origen, clave, referencia.nombre);
