@@ -99,7 +99,7 @@ function prepararOpciones() {
   for (const [clave, referencia] of Object.entries(datos.referencias)) opcion(origen, clave, referencia.nombre);
   for (const [clave, edificio] of Object.entries(datos.edificios)) opcion(origen, clave, edificio.nombre);
   const porSala = document.createElement('optgroup');
-  porSala.label = 'Salas en el mapa';
+  porSala.label = 'Salas con ubicación';
   for (const sala of horario.aulas.filter(sala => sala.punto)) opcion(porSala, sala.codigo, 'Sala ' + sala.codigo);
   origen.append(porSala);
 }
@@ -193,10 +193,10 @@ function tarjetaSala(ficha, fechaConsulta) {
   const piso = sala.piso == null ? '' : ' · Piso ' + sala.piso;
   tarjeta.querySelector('.ubicacion').textContent = (datos.edificios[sala.edificio]?.nombre ?? 'San Joaquín') + piso;
   tarjeta.querySelector('.codigo').textContent = sala.codigo;
-  if (sala.notaUbicacion) {
+  if (sala.referenciaUbicacion || sala.notaUbicacion) {
     const nota = tarjeta.querySelector('.ubicacion-nota');
-    nota.textContent = 'Ubicación exacta por confirmar';
-    nota.title = sala.notaUbicacion;
+    nota.textContent = sala.referenciaUbicacion ?? 'Ubicación exacta por confirmar';
+    if (sala.notaUbicacion) nota.title = sala.notaUbicacion;
     nota.hidden = false;
   }
 

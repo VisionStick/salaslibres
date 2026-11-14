@@ -104,7 +104,7 @@
     {"codigo": "F408","edificio": "F","piso": 4,"estado": "aula","enMapa": true,"bloquesRegistrados": 46,"etiquetasFuente": ["F408-SJ"],"punto": [675,767]},
     {"codigo": "F409","edificio": "F","piso": 4,"estado": "aula","enMapa": true,"bloquesRegistrados": 42,"etiquetasFuente": ["F409-SJ"],"punto": [675,734]},
     {"codigo": "F410","edificio": "F","piso": 4,"estado": "solo_mapa","enMapa": true,"bloquesRegistrados": 0,"etiquetasFuente": [],"punto": [721,744],"motivo": "El mapa la identifica y el horario del semestre no registra clases con este código."},
-    {"codigo": "F411","edificio": "F","piso": 4,"estado": "aula","enMapa": false,"bloquesRegistrados": 48,"etiquetasFuente": ["F411-SJ"],"notaUbicacion": "El horario usa F411 para clases regulares. El piso se deduce del código y la ubicación exacta requiere confirmación."},
+    {"codigo": "F411","edificio": "F","piso": 4,"estado": "aula","enMapa": false,"bloquesRegistrados": 48,"etiquetasFuente": ["F411-SJ"],"punto": [755,521],"referenciaUbicacion": "Junto a F405 y F402"},
     {"codigo": "F425","edificio": "F","piso": 4,"estado": "aula","enMapa": true,"bloquesRegistrados": 34,"etiquetasFuente": ["F425-SJ A"],"punto": [678,904]},
     {"codigo": "Gimnasio · Cancha 1","edificio": null,"piso": null,"estado": "revision","enMapa": false,"bloquesRegistrados": 42,"etiquetasFuente": ["GIMNASIO CANCHA 1-SJ"],"motivo": "Espacio especial o sala cuyo tipo requiere confirmación."},
     {"codigo": "Gimnasio · Cancha 2","edificio": null,"piso": null,"estado": "revision","enMapa": false,"bloquesRegistrados": 36,"etiquetasFuente": ["GIMNASIO CANCHA 2-SJ"],"motivo": "Espacio especial o sala cuyo tipo requiere confirmación."},

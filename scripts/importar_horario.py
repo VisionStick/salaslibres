@@ -124,7 +124,7 @@ def recorrer(ramos):
 
 def catalogar_salas(campus, sesiones):
     mapa = campus["mapa"]["salas"]
-    configuradas = campus["ubicacionesPorConfirmar"]
+    configuradas = campus["ubicacionesComplementarias"]
     exclusiones = set(campus["exclusiones"])
     revision = campus["revision"]
     excepciones_ks = set(campus["excepcionesSubterraneo"])
@@ -134,8 +134,9 @@ def catalogar_salas(campus, sesiones):
         ubicacion = codigo if codigo in mapa else codigo[:4] if codigo[:4] in mapa else None
         edificio = codigo[0] if re.match(r"^(?:KS|[A-Z])\d", codigo) else None
         piso, x, y = mapa.get(ubicacion, [None, None, None])
-        nota = configuradas.get(codigo, {}).get("nota")
-        piso = configuradas.get(codigo, {}).get("piso", piso)
+        complemento = configuradas.get(codigo, {})
+        piso = complemento.get("piso", piso)
+        x, y = complemento.get("punto", [x, y])
         if codigo in exclusiones:
             estado, motivo = "excluida", "Sala indicada en la lista de exclusión."
         elif re.fullmatch(r"KS\d{3}[A-Z]?", codigo) and codigo not in excepciones_ks:
@@ -157,8 +158,10 @@ def catalogar_salas(campus, sesiones):
         }
         if x is not None:
             sala["punto"] = [x, y]
-        if nota:
-            sala["notaUbicacion"] = nota
+        if "nota" in complemento:
+            sala["notaUbicacion"] = complemento["nota"]
+        if "referencia" in complemento:
+            sala["referenciaUbicacion"] = complemento["referencia"]
         if motivo:
             sala["motivo"] = motivo
         salas.append(sala)

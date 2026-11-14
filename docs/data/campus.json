@@ -83,9 +83,9 @@
     "K306": "El mapa dice K306. B306 figura en la lista de exclusión y el horario de K306 incluye laboratorios.",
     "TUMA Vitacura": "El nombre indica Vitacura y el campo campus dice San Joaquín. La sede requiere confirmación."
   },
-  "ubicacionesPorConfirmar": {
+  "ubicacionesComplementarias": {
     "K204": {"piso": 2, "nota": "El piso se deduce del código y la ubicación exacta requiere confirmación."},
     "F406": {"piso": 4, "nota": "El mapa muestra el código F406 en dos puntos del piso 4."},
-    "F411": {"piso": 4, "nota": "El horario usa F411 para clases regulares. El piso se deduce del código y la ubicación exacta requiere confirmación."}
+    "F411": {"piso": 4, "punto": [755, 521], "referencia": "Junto a F405 y F402"}
   }
 }
