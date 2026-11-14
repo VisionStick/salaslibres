@@ -8,6 +8,7 @@
   <title>Sala Libre · San Joaquín</title>
   <link rel="icon" type="image/png" href="./icono.png">
   <link rel="stylesheet" href="./estilos.css">
+  <link rel="stylesheet" href="./mapa.css">
   <script type="module" src="./app.mjs"></script>
 </head>
 <body>
@@ -20,7 +21,7 @@
       </a>
       <div class="barra-acciones">
         <span class="semestre" id="semestre" hidden></span>
-        <button type="button" class="enlace-boton" id="abrir-datos">Mapa y datos</button>
+        <button type="button" class="enlace-boton" id="abrir-datos" aria-haspopup="dialog" aria-controls="dialogo-datos" disabled>Mapa del campus</button>
       </div>
     </div>
   </header>
@@ -33,10 +34,10 @@
         <p class="intro">Revisa qué salas están libres y cuánto tiempo tienes antes de la siguiente clase.</p>
         <button type="button" class="boton ahora" id="ahora" disabled><span class="icono-reloj" aria-hidden="true"></span> Buscar salas libres ahora</button>
       </div>
-      <div class="portada-mapa" aria-label="Filtrar por edificio">
-        <div class="plano plano-portada" id="mapa-portada"></div>
-        <p>Elige un edificio en el mapa</p>
-      </div>
+      <button type="button" class="portada-mapa" id="abrir-mapa-portada" aria-haspopup="dialog" aria-controls="dialogo-datos" disabled>
+        <canvas id="mapa-portada" aria-hidden="true"></canvas>
+        <span>Explorar mapa <span aria-hidden="true">↗</span></span>
+      </button>
     </section>
 
     <form id="buscar" class="buscador" aria-label="Buscar por día y hora">
@@ -80,6 +81,7 @@
           <select id="origen" aria-describedby="nota-cercania"></select>
           <small id="nota-cercania">Cercanía aproximada según el mapa.</small>
         </div>
+        <button type="button" class="enlace-boton" id="abrir-mapa-resultados" aria-haspopup="dialog" aria-controls="dialogo-datos">Ver en el mapa <span aria-hidden="true">↗</span></button>
       </div>
       <div id="mensaje" class="mensaje" hidden>
         <strong id="mensaje-titulo"></strong>
@@ -110,24 +112,94 @@
     <div id="opciones-bloque" class="opciones-bloque"></div>
   </dialog>
 
-  <dialog id="dialogo-datos" aria-labelledby="titulo-datos">
+  <dialog id="dialogo-datos" class="mapa-dialogo" aria-labelledby="titulo-datos">
     <div class="dialogo-cabecera">
       <div>
-        <h2 id="titulo-datos">Mapa y datos</h2>
-        <p>Campus Santiago San Joaquín</p>
+        <h2 id="titulo-datos">Mapa del campus</h2>
+        <p>Santiago San Joaquín <span id="mapa-semestre"></span></p>
       </div>
       <form method="dialog"><button type="submit" class="cerrar" aria-label="Cerrar">×</button></form>
     </div>
-    <div class="plano plano-dialogo" id="mapa-dialogo" aria-label="Edificios del campus"></div>
-    <p class="nota-mapa">Ubicaciones aproximadas a partir de «Soy el mapa». Elige un edificio para filtrar la búsqueda.</p>
-    <div class="datos-semestre" id="datos-semestre"></div>
-    <details id="revision">
-      <summary>Espacios por revisar</summary>
-      <ul class="lista-datos" id="lista-revision"></ul>
-    </details>
-    <details id="solo-mapa">
-      <summary>Salas que figuran solo en el mapa</summary>
-      <ul class="lista-datos" id="lista-mapa"></ul>
+    <form id="mapa-consulta" class="mapa-consulta" aria-label="Cambiar día y hora del mapa">
+      <div class="campo">
+        <label for="mapa-dia">Día</label>
+        <select id="mapa-dia" required></select>
+      </div>
+      <div class="campo">
+        <label for="mapa-hora">Hora</label>
+        <input id="mapa-hora" type="time" required>
+      </div>
+      <button type="submit" class="boton buscar">Actualizar</button>
+      <button type="button" class="boton boton-secundario" id="mapa-ahora">Ahora</button>
+    </form>
+    <section class="mapa-interactivo" aria-label="Plano interactivo de salas">
+      <div class="mapa-barra">
+        <div class="mapa-niveles">
+          <span id="mapa-pisos-label">Piso</span>
+          <div class="mapa-pisos" role="group" aria-labelledby="mapa-pisos-label"></div>
+        </div>
+        <div class="mapa-filtros">
+          <label for="mapa-sector" class="solo-lector">Edificio en el mapa</label>
+          <select id="mapa-sector"></select>
+          <label for="mapa-sala" class="solo-lector">Ir a una sala</label>
+          <select id="mapa-sala"><option value="">Ir a una sala</option></select>
+        </div>
+      </div>
+      <div class="mapa-estados">
+        <ul class="mapa-leyenda" aria-label="Estados de disponibilidad">
+          <li class="mapa-estado" data-color="ocupada"><span aria-hidden="true">×</span> Ocupada</li>
+          <li class="mapa-estado" data-color="corta"><span aria-hidden="true">−</span> Hasta 2 bloques</li>
+          <li class="mapa-estado" data-color="larga"><span aria-hidden="true">+</span> Más de 2 bloques</li>
+          <li class="mapa-estado mapa-leyenda-sin-datos" data-color="sin-datos" hidden><span aria-hidden="true">·</span> Sin horario</li>
+        </ul>
+        <p class="mapa-momento" role="status"></p>
+      </div>
+      <p class="mapa-aviso" role="status" hidden></p>
+      <div class="mapa-cuerpo">
+        <div class="mapa-plano">
+          <div class="mapa-ventana" role="region" aria-label="Plano del campus">
+            <div class="mapa-escena">
+              <canvas aria-hidden="true"></canvas>
+              <div class="mapa-marcadores"></div>
+            </div>
+          </div>
+          <p class="mapa-deslizar" id="mapa-deslizar" hidden>Desliza hacia los lados para recorrer el plano.</p>
+          <div class="mapa-pendientes" hidden>
+            <span>Ubicación exacta por confirmar</span>
+            <div class="mapa-pendientes-salas"></div>
+          </div>
+        </div>
+        <aside class="mapa-detalle" aria-label="Detalle de la sala" aria-live="polite">
+          <div class="mapa-detalle-vacio">
+            <p class="mapa-total"></p>
+            <h3>Explora las salas</h3>
+            <p>Selecciona una sala para ver su intervalo disponible y la próxima clase.</p>
+          </div>
+          <div class="mapa-detalle-ficha" hidden>
+            <p class="mapa-detalle-ubicacion"></p>
+            <h3 class="mapa-detalle-codigo"></h3>
+            <p class="mapa-detalle-referencia" hidden></p>
+            <span class="mapa-estado"><span aria-hidden="true"></span><span></span></span>
+            <p class="mapa-detalle-tramo"></p>
+            <p class="mapa-detalle-duracion"></p>
+            <p class="mapa-detalle-clase"></p>
+          </div>
+        </aside>
+      </div>
+      <p class="nota-mapa">Plano esquemático basado en «Soy el mapa». Los estados se calculan con el horario publicado y los bloques completos que quedan desde la hora consultada.</p>
+      <p class="nota-mapa mapa-minimo" hidden>La duración mínima se aplica al listado de resultados.</p>
+    </section>
+    <details class="mapa-fuentes">
+      <summary>Datos del semestre y otras salas</summary>
+      <div class="datos-semestre" id="datos-semestre"></div>
+      <details id="revision">
+        <summary>Espacios por revisar</summary>
+        <ul class="lista-datos" id="lista-revision"></ul>
+      </details>
+      <details id="solo-mapa">
+        <summary>Salas que figuran solo en el mapa</summary>
+        <ul class="lista-datos" id="lista-mapa"></ul>
+      </details>
     </details>
   </dialog>
 

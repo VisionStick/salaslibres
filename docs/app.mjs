@@ -1,4 +1,5 @@
-import { buscarSalas, hhmm, minutos, ordenarSalas, prepararHorario, relojCampus } from './disponibilidad.mjs';
+import { buscarSalas, coberturaConsulta, hhmm, minutos, ordenarSalas, prepararHorario, proximaClaseEnPeriodo, relojCampus } from './disponibilidad.mjs';
+import { crearMapa, prepararMiniatura } from './mapa.mjs';
 
 const id = nombre => document.getElementById(nombre);
 const dia = id('dia');
@@ -7,10 +8,14 @@ const duracion = id('duracion');
 const orden = id('orden');
 const origen = id('origen');
 const resultado = id('resultados');
+const dialogoMapa = id('dialogo-datos');
+const mapaDia = id('mapa-dia');
+const mapaHora = id('mapa-hora');
 const estado = { edificio: '', modoAhora: false, limite: 12 };
 let periodo;
 let datos;
 let horario;
+let mapa;
 
 const numero = new Intl.NumberFormat('es-CL', { useGrouping: 'always' });
 const fechaLocal = new Intl.DateTimeFormat('es-CL', {
@@ -48,7 +53,7 @@ function irAResultados() {
   resultado.scrollIntoView({ block: 'start' });
 }
 
-function filtrarEdificio(codigo, desplazar = false) {
+function filtrarEdificio(codigo) {
   if (!horario) return;
   estado.edificio = codigo;
   estado.limite = 12;
@@ -56,28 +61,9 @@ function filtrarEdificio(codigo, desplazar = false) {
     boton.setAttribute('aria-pressed', String(boton.dataset.edificio === codigo));
   }
   mostrar();
-  if (desplazar) irAResultados();
 }
 
-function prepararMapa() {
-  const crearPin = (codigo, edificio, dialogo) => {
-    const pin = boton(codigo, 'plano-punto', () => {
-      if (dialogo) id('dialogo-datos').close();
-      filtrarEdificio(estado.edificio === codigo ? '' : codigo, true);
-    });
-    pin.setAttribute('aria-label', edificio.nombre);
-    pin.setAttribute('aria-pressed', 'false');
-    pin.dataset.edificio = codigo;
-    const [x, y] = edificio.punto;
-    pin.style.setProperty('--x', (11 + (x - 190) * 0.076) + '%');
-    pin.style.setProperty('--y', (14 + (y - 140) * 0.085) + '%');
-    return pin;
-  };
-
-  for (const [codigo, edificio] of Object.entries(datos.edificios)) {
-    id('mapa-portada').append(crearPin(codigo, edificio, false));
-    id('mapa-dialogo').append(crearPin(codigo, edificio, true));
-  }
+function prepararFiltros() {
   for (const [codigo, etiqueta] of [['', 'Todos'], ...Object.entries(datos.edificios).map(
     ([clave, edificio]) => [clave, edificio.nombre],
   )]) {
@@ -89,7 +75,10 @@ function prepararMapa() {
 }
 
 function prepararOpciones() {
-  for (const [i, nombre] of datos.dias.entries()) opcion(dia, i, nombre);
+  for (const [i, nombre] of datos.dias.entries()) {
+    opcion(dia, i, nombre);
+    opcion(mapaDia, i, nombre);
+  }
   opcion(duracion, 0, 'Cualquier duración');
   for (const bloque of horario.bloques) {
     const n = bloque.numero;
@@ -159,17 +148,12 @@ function textoDuracion(minutosLibres) {
 }
 
 function escribirClase(tarjeta, ficha, fechaConsulta) {
-  const { clases, dias } = ficha.proxima;
+  const clases = proximaClaseEnPeriodo(ficha, fechaConsulta, periodo.finDiurno);
+  const { dias } = ficha.proxima;
   const proxima = clases[0];
   const etiqueta = tarjeta.querySelector('.proxima-etiqueta');
   const clase = tarjeta.querySelector('.proxima-clase');
-  let fueraDePeriodo = false;
-  if (fechaConsulta && dias > 0) {
-    const fechaProxima = new Date(fechaConsulta + 'T00:00:00Z');
-    fechaProxima.setUTCDate(fechaProxima.getUTCDate() + dias);
-    fueraDePeriodo = fechaProxima.toISOString().slice(0, 10) > periodo.finDiurno;
-  }
-  if (!proxima || fueraDePeriodo) {
+  if (!proxima) {
     etiqueta.textContent = 'Próxima clase';
     clase.textContent = 'Sin clase posterior en el horario';
     return;
@@ -202,7 +186,7 @@ function tarjetaSala(ficha, fechaConsulta) {
 
   const etiqueta = tarjeta.querySelector('.conveniencia');
   const nivel = completos >= 3 ? 'Muy conveniente' : completos === 2 ? 'Disponible' : 'Poco tiempo';
-  if (completos < 3) etiqueta.classList.add(completos === 2 ? 'media' : 'breve');
+  if (completos < 3) etiqueta.classList.add('media');
   etiqueta.lastElementChild.textContent = nivel;
 
   const tiempos = tarjeta.querySelectorAll('.franja time');
@@ -228,13 +212,22 @@ function mostrar() {
   const { dia: diaConsulta, desde, minimo, fecha } = estado.consulta;
   const cobertura = horario.cobertura[diaConsulta];
   const delSemestre = !fecha || (fecha >= periodo.inicioDiurno && fecha <= periodo.finDiurno);
+  const enHorario = delSemestre && Boolean(coberturaConsulta(horario, estado.consulta));
+  const avisoMapa = !delSemestre ? 'La fecha está fuera del semestre ' + datos.semestre + '.'
+    : !cobertura ? 'No hay horarios con sala registrada para este día.'
+    : !enHorario ? 'Horario registrado de ' + hhmm(cobertura.desde) + ' a ' + hhmm(cobertura.hasta) + '.'
+    : '';
   const sector = estado.edificio ? ' · Edificio ' + estado.edificio : '';
   const contexto = (fecha ? 'Ahora · ' : '') + datos.dias[diaConsulta] + ' · ' + hhmm(desde) + sector;
   id('salas').replaceChildren();
   id('pie-resultados').hidden = true;
   id('campo-origen').hidden = orden.value !== 'cercania';
 
-  if (!delSemestre || !cobertura || desde < cobertura.desde || desde >= cobertura.hasta) {
+  if (dialogoMapa.open) {
+    actualizarMapa(enHorario, avisoMapa);
+  }
+
+  if (!enHorario) {
     id('resumen').textContent = contexto;
     if (!delSemestre) {
       mensaje('La fecha está fuera del semestre ' + datos.semestre + '.', 'Puedes consultar el horario semanal guardado con la búsqueda por día y hora.');
@@ -267,10 +260,24 @@ function mostrar() {
   id('mas').textContent = 'Mostrar más salas (' + Math.max(0, restantes) + ')';
 }
 
-function buscarAhora(desplazar) {
+function actualizarMapa(enHorario, aviso) {
+  const consulta = estado.consulta;
+  mapaDia.value = consulta.dia;
+  mapaHora.value = hhmm(consulta.desde);
+  mapa.actualizar(consulta, enHorario, aviso);
+}
+
+function abrirMapa() {
+  if (!horario) return;
+  if (!mapa) mapa = crearMapa(dialogoMapa.querySelector('.mapa-interactivo'), datos, horario, periodo);
+  dialogoMapa.showModal();
+  mostrar();
+}
+
+function buscarAhora(desplazar, forzar = false) {
   const reloj = relojCampus(datos.zonaHoraria);
   const desde = minutos(reloj.hora);
-  if (!desplazar && estado.consulta?.desde === desde && estado.consulta?.fecha === reloj.fecha) return;
+  if (!desplazar && !forzar && estado.consulta?.desde === desde && estado.consulta?.fecha === reloj.fecha) return;
   dia.value = reloj.dia;
   hora.value = reloj.hora;
   estado.modoAhora = true;
@@ -302,7 +309,8 @@ async function iniciar() {
     if (datos.version !== 1 || datos.semestre !== periodo.semestre) throw new Error('Versión de datos inválida');
     horario = prepararHorario(datos);
     prepararOpciones();
-    prepararMapa();
+    prepararFiltros();
+    prepararMiniatura(id('mapa-portada'));
     describirDatos();
 
     const reloj = relojCampus(datos.zonaHoraria);
@@ -316,8 +324,9 @@ async function iniciar() {
     duracion.value = '0';
     id('semestre').textContent = 'Semestre ' + datos.semestre;
     id('semestre').hidden = false;
+    id('mapa-semestre').textContent = '· Semestre ' + datos.semestre;
     id('filtros').hidden = false;
-    for (const control of [dia, hora, duracion, orden, id('ahora'), id('enviar'), id('ver-bloques')]) {
+    for (const control of [dia, hora, duracion, orden, id('ahora'), id('enviar'), id('ver-bloques'), id('abrir-datos'), id('abrir-mapa-portada')]) {
       control.disabled = false;
     }
     buscarSeleccion(false);
@@ -340,7 +349,19 @@ id('ver-bloques').addEventListener('click', () => {
   configurarBloques();
   id('dialogo-bloques').showModal();
 });
-id('abrir-datos').addEventListener('click', () => id('dialogo-datos').showModal());
+for (const entrada of ['abrir-datos', 'abrir-mapa-portada', 'abrir-mapa-resultados']) {
+  id(entrada).addEventListener('click', abrirMapa);
+}
+id('mapa-consulta').addEventListener('submit', evento => {
+  evento.preventDefault();
+  dia.value = mapaDia.value;
+  hora.value = mapaHora.value;
+  buscarSeleccion(false);
+});
+for (const control of [mapaDia, mapaHora]) {
+  control.addEventListener('input', () => { estado.modoAhora = false; });
+}
+id('mapa-ahora').addEventListener('click', () => buscarAhora(false, true));
 orden.addEventListener('change', () => { estado.limite = 12; mostrar(); });
 origen.addEventListener('change', () => { estado.limite = 12; mostrar(); });
 id('menos-tiempo').addEventListener('click', () => {

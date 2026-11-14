@@ -90,27 +90,69 @@ function proximaClase(semana, dia, desde) {
   return { clases: [], dias: null };
 }
 
-export function buscarSalas(horario, { dia, desde, minimo = 0, edificio = '' }) {
+export function contarBloques(bloques, desde, hasta) {
+  return bloques.filter(bloque => bloque.desde >= desde && bloque.hasta <= hasta).length;
+}
+
+export function proximaClaseEnPeriodo(ficha, fechaConsulta, finSemestre) {
+  const { clases, dias } = ficha.proxima;
+  if (!fechaConsulta || !dias) return clases;
+  const fecha = new Date(fechaConsulta + 'T00:00:00Z');
+  fecha.setUTCDate(fecha.getUTCDate() + dias);
+  return fecha.toISOString().slice(0, 10) <= finSemestre ? clases : [];
+}
+
+export function coberturaConsulta(horario, { dia, desde }) {
   const cobertura = horario.cobertura[dia];
-  if (!cobertura || !Number.isFinite(desde) || desde < cobertura.desde || desde >= cobertura.hasta) return [];
+  return cobertura && Number.isFinite(desde) && desde >= cobertura.desde && desde < cobertura.hasta
+    ? cobertura : null;
+}
+
+function evaluarSala(horario, sala, dia, desde, cobertura) {
+  const semana = horario.porSala.get(sala.codigo);
+  const sesiones = semana[dia];
+  const enCurso = sesiones.filter(sesion => sesion.desde <= desde && desde < sesion.hasta);
+  if (enCurso.length) {
+    let hasta = Math.max(...enCurso.map(sesion => sesion.hasta));
+    let hastaLibre = cobertura.hasta;
+    for (const sesion of sesiones) {
+      if (sesion.desde > hasta) {
+        hastaLibre = sesion.desde;
+        break;
+      }
+      hasta = Math.max(hasta, sesion.hasta);
+    }
+    const proximaLibre = hasta < hastaLibre ? { desde: hasta, hasta: hastaLibre } : null;
+    return { sala, estado: 'ocupada', hasta, enCurso, proximaLibre };
+  }
+
+  const proxima = proximaClase(semana, dia, desde);
+  const siguienteHoy = proxima.dias === 0 ? proxima.clases[0] : null;
+  const hasta = siguienteHoy?.desde ?? cobertura.hasta;
+  const libreDesde = sesiones.reduce(
+    (inicio, sesion) => sesion.hasta <= desde ? Math.max(inicio, sesion.hasta) : inicio,
+    cobertura.desde,
+  );
+  const completos = contarBloques(horario.bloques, desde, hasta);
+  return { sala, estado: 'libre', libreDesde, hasta, completos, minutos: hasta - desde, proxima, siguienteHoy };
+}
+
+export function evaluarAulas(horario, consulta, vigente = true) {
+  const cobertura = vigente ? coberturaConsulta(horario, consulta) : null;
+  return new Map(horario.aulas.map(sala => [sala.codigo, cobertura
+    ? evaluarSala(horario, sala, consulta.dia, consulta.desde, cobertura)
+    : { sala, estado: 'sin-datos' }]));
+}
+
+export function buscarSalas(horario, { dia, desde, minimo = 0, edificio = '' }) {
+  const cobertura = coberturaConsulta(horario, { dia, desde });
+  if (!cobertura) return [];
 
   const resultados = [];
   for (const sala of horario.aulas) {
     if (edificio && sala.edificio !== edificio) continue;
-    const semana = horario.porSala.get(sala.codigo);
-    const sesiones = semana[dia];
-    if (sesiones.some(sesion => sesion.desde <= desde && desde < sesion.hasta)) continue;
-
-    const proxima = proximaClase(semana, dia, desde);
-    const siguienteHoy = proxima.dias === 0 ? proxima.clases[0] : null;
-    const hasta = siguienteHoy?.desde ?? cobertura.hasta;
-    const libreDesde = sesiones.reduce(
-      (inicio, sesion) => sesion.hasta <= desde ? Math.max(inicio, sesion.hasta) : inicio,
-      cobertura.desde,
-    );
-    const completos = horario.bloques.filter(bloque => bloque.desde >= desde && bloque.hasta <= hasta).length;
-    if (completos < minimo) continue;
-    resultados.push({ sala, libreDesde, hasta, completos, minutos: hasta - desde, proxima, siguienteHoy });
+    const ficha = evaluarSala(horario, sala, dia, desde, cobertura);
+    if (ficha.estado === 'libre' && ficha.completos >= minimo) resultados.push(ficha);
   }
   return resultados;
 }
