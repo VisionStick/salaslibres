@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#132b29">
-  <meta name="description" content="Busca salas sin clases programadas por día y hora en el campus Santiago San Joaquín de la USM.">
+  <meta name="description" content="Busca salas sin clases programadas por día, hora o bloque en el campus Santiago San Joaquín de la USM.">
   <title>Sala Libre · San Joaquín</title>
   <link rel="icon" type="image/png" href="./icono.png">
   <link rel="stylesheet" href="./estilos.css">
@@ -40,17 +40,25 @@
       </button>
     </section>
 
-    <form id="buscar" class="buscador" aria-label="Buscar por día y hora">
+    <form id="buscar" class="buscador" aria-label="Buscar salas por día, hora o bloque">
       <div class="campo">
         <label for="dia">Día</label>
         <select id="dia" name="dia" required disabled></select>
       </div>
+      <div class="campo">
+        <label for="modo">Buscar por</label>
+        <select id="modo" name="modo" disabled>
+          <option value="hora">Hora</option>
+          <option value="bloque">Bloque</option>
+        </select>
+      </div>
       <div class="campo campo-hora">
-        <div class="etiqueta-hora">
-          <label for="hora">Desde</label>
-          <button type="button" id="ver-bloques" class="enlace-boton enlace-pequeno" disabled>Elegir bloque</button>
-        </div>
-        <input type="time" id="hora" name="hora" required disabled>
+        <label for="hora">Hora (24 h)</label>
+        <input id="hora" name="hora" type="text" inputmode="numeric" placeholder="09:40" autocomplete="off" spellcheck="false" required disabled>
+      </div>
+      <div class="campo campo-bloque" hidden>
+        <label for="bloque">Bloque</label>
+        <select id="bloque" name="bloque" required disabled><option value="">Elige un bloque</option></select>
       </div>
       <div class="campo">
         <label for="duracion">Duración mínima</label>
@@ -74,6 +82,7 @@
           </select>
         </div>
       </div>
+      <p class="subtitulo aviso-consulta" id="aviso-consulta" role="status" hidden></p>
       <div class="filtros" id="filtros" hidden>
         <div class="edificios" id="edificios" role="group" aria-label="Filtrar por edificio"></div>
         <div class="origen" id="campo-origen" hidden>
@@ -101,17 +110,6 @@
     <noscript><p class="mensaje">Activa JavaScript para consultar el horario y buscar salas.</p></noscript>
   </main>
 
-  <dialog id="dialogo-bloques" aria-labelledby="titulo-bloques">
-    <div class="dialogo-cabecera">
-      <div>
-        <h2 id="titulo-bloques">Elegir un bloque</h2>
-        <p>Cada bloque numerado dura 35 minutos.</p>
-      </div>
-      <form method="dialog"><button type="submit" class="cerrar" aria-label="Cerrar">×</button></form>
-    </div>
-    <div id="opciones-bloque" class="opciones-bloque"></div>
-  </dialog>
-
   <dialog id="dialogo-datos" class="mapa-dialogo" aria-labelledby="titulo-datos">
     <div class="dialogo-cabecera">
       <div>
@@ -120,14 +118,25 @@
       </div>
       <form method="dialog"><button type="submit" class="cerrar" aria-label="Cerrar">×</button></form>
     </div>
-    <form id="mapa-consulta" class="mapa-consulta" aria-label="Cambiar día y hora del mapa">
+    <form id="mapa-consulta" class="mapa-consulta" aria-label="Consultar el mapa por día, hora o bloque">
       <div class="campo">
         <label for="mapa-dia">Día</label>
-        <select id="mapa-dia" required></select>
+        <select id="mapa-dia" name="dia" required></select>
       </div>
       <div class="campo">
-        <label for="mapa-hora">Hora</label>
-        <input id="mapa-hora" type="time" required>
+        <label for="mapa-modo">Buscar por</label>
+        <select id="mapa-modo" name="modo">
+          <option value="hora">Hora</option>
+          <option value="bloque">Bloque</option>
+        </select>
+      </div>
+      <div class="campo campo-hora">
+        <label for="mapa-hora">Hora (24 h)</label>
+        <input id="mapa-hora" name="hora" type="text" inputmode="numeric" placeholder="09:40" autocomplete="off" spellcheck="false" required>
+      </div>
+      <div class="campo campo-bloque" hidden>
+        <label for="mapa-bloque">Bloque</label>
+        <select id="mapa-bloque" name="bloque" required disabled><option value="">Elige</option></select>
       </div>
       <button type="submit" class="boton buscar">Actualizar</button>
       <button type="button" class="boton boton-secundario" id="mapa-ahora">Ahora</button>
@@ -186,7 +195,7 @@
           </div>
         </aside>
       </div>
-      <p class="nota-mapa">Plano esquemático basado en «Soy el mapa». Los estados se calculan con el horario publicado y los bloques completos que quedan desde la hora consultada.</p>
+      <p class="nota-mapa">Plano esquemático basado en «Soy el mapa». Los estados se calculan según los bloques completos disponibles, con los recreos de 15 minutos descontados.</p>
       <p class="nota-mapa mapa-minimo" hidden>La duración mínima se aplica al listado de resultados.</p>
     </section>
     <details class="mapa-fuentes">

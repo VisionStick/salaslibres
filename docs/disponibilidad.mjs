@@ -21,11 +21,19 @@ export function relojCampus(zonaHoraria, fecha = new Date()) {
 }
 
 const ordenarCodigo = new Intl.Collator('es-CL', { numeric: true });
+const RECREO_MINUTOS = 15;
 
 export function prepararHorario(datos) {
   const bloques = datos.bloques.map(bloque => ({
     ...bloque, desde: minutos(bloque.inicio), hasta: minutos(bloque.fin),
   }));
+  const recreos = bloques.slice(1).flatMap((siguiente, i) => {
+    const anterior = bloques[i];
+    // El intervalo largo de almuerzo tiene tratamiento propio en la consulta.
+    return siguiente.desde - anterior.hasta === RECREO_MINUTOS
+      ? [{ desde: anterior.hasta, hasta: siguiente.desde, bloque: siguiente.numero }]
+      : [];
+  });
   const cobertura = Array.from({ length: datos.dias.length }, () => null);
   const porSala = new Map(datos.salas.map(sala => [
     sala.codigo, Array.from({ length: datos.dias.length }, () => []),
@@ -49,7 +57,7 @@ export function prepararHorario(datos) {
           for (const fila of clase.sort((a, b) => a.bloque - b.bloque)) {
             const desde = minutos(fila.inicio);
             const hasta = minutos(fila.fin);
-            if (sesion && fila.bloque <= sesion.ultimoBloque + 1 && desde - sesion.hasta <= 15) {
+            if (sesion && fila.bloque <= sesion.ultimoBloque + 1 && desde - sesion.hasta <= RECREO_MINUTOS) {
               sesion.hasta = Math.max(sesion.hasta, hasta);
               sesion.ultimoBloque = Math.max(sesion.ultimoBloque, fila.bloque);
             } else {
@@ -73,7 +81,7 @@ export function prepararHorario(datos) {
       sesiones.sort((a, b) => a.desde - b.desde || ordenarCodigo.compare(a.sigla, b.sigla));
     }
   }
-  return { bloques, cobertura, porSala, aulas: datos.salas.filter(sala => sala.estado === 'aula') };
+  return { bloques, recreos, cobertura, porSala, aulas: datos.salas.filter(sala => sala.estado === 'aula') };
 }
 
 function clasesQueEmpiezan(sesiones) {
@@ -94,6 +102,16 @@ export function contarBloques(bloques, desde, hasta) {
   return bloques.filter(bloque => bloque.desde >= desde && bloque.hasta <= hasta).length;
 }
 
+function recreoEn(horario, minuto) {
+  return horario.recreos.find(pausa => minuto >= pausa.desde && minuto < pausa.hasta);
+}
+
+function minutosSinRecreos(recreos, desde, hasta) {
+  const minutosRecreo = recreos.reduce((total, pausa) => total + Math.max(0,
+    Math.min(hasta, pausa.hasta) - Math.max(desde, pausa.desde)), 0);
+  return hasta - desde - minutosRecreo;
+}
+
 export function proximaClaseEnPeriodo(ficha, fechaConsulta, finSemestre) {
   const { clases, dias } = ficha.proxima;
   if (!fechaConsulta || !dias) return clases;
@@ -108,6 +126,20 @@ export function coberturaConsulta(horario, { dia, desde }) {
     ? cobertura : null;
 }
 
+export function resolverConsulta(horario, consulta) {
+  const recreo = recreoEn(horario, consulta.desde);
+  if (!recreo || !coberturaConsulta(horario, consulta)) return consulta;
+  return { ...consulta, horaConsultada: consulta.desde, desde: recreo.hasta, bloqueRecreo: recreo.bloque };
+}
+
+function siguienteMomentoUtil(horario, desde) {
+  return recreoEn(horario, desde)?.hasta ?? desde;
+}
+
+function finDeFranja(horario, hasta) {
+  return recreoEn(horario, hasta - 1)?.desde ?? hasta;
+}
+
 function evaluarSala(horario, sala, dia, desde, cobertura) {
   const semana = horario.porSala.get(sala.codigo);
   const sesiones = semana[dia];
@@ -116,35 +148,43 @@ function evaluarSala(horario, sala, dia, desde, cobertura) {
     let hasta = Math.max(...enCurso.map(sesion => sesion.hasta));
     let hastaLibre = cobertura.hasta;
     for (const sesion of sesiones) {
-      if (sesion.desde > hasta) {
+      if (sesion.desde > siguienteMomentoUtil(horario, hasta)) {
         hastaLibre = sesion.desde;
         break;
       }
       hasta = Math.max(hasta, sesion.hasta);
     }
-    const proximaLibre = hasta < hastaLibre ? { desde: hasta, hasta: hastaLibre } : null;
+    const siguienteInicio = siguienteMomentoUtil(horario, hasta);
+    hastaLibre = finDeFranja(horario, hastaLibre);
+    const proximaLibre = siguienteInicio < hastaLibre ? { desde: siguienteInicio, hasta: hastaLibre } : null;
     return { sala, estado: 'ocupada', hasta, enCurso, proximaLibre };
   }
 
   const proxima = proximaClase(semana, dia, desde);
   const siguienteHoy = proxima.dias === 0 ? proxima.clases[0] : null;
-  const hasta = siguienteHoy?.desde ?? cobertura.hasta;
-  const libreDesde = sesiones.reduce(
+  const hasta = finDeFranja(horario, siguienteHoy?.desde ?? cobertura.hasta);
+  const ultimaClase = sesiones.reduce(
     (inicio, sesion) => sesion.hasta <= desde ? Math.max(inicio, sesion.hasta) : inicio,
     cobertura.desde,
   );
+  const libreDesde = siguienteMomentoUtil(horario, ultimaClase);
   const completos = contarBloques(horario.bloques, desde, hasta);
-  return { sala, estado: 'libre', libreDesde, hasta, completos, minutos: hasta - desde, proxima, siguienteHoy };
+  return {
+    sala, estado: 'libre', libreDesde, hasta, completos,
+    minutos: minutosSinRecreos(horario.recreos, desde, hasta), proxima, siguienteHoy,
+  };
 }
 
 export function evaluarAulas(horario, consulta, vigente = true) {
-  const cobertura = vigente ? coberturaConsulta(horario, consulta) : null;
+  const { dia, desde } = resolverConsulta(horario, consulta);
+  const cobertura = vigente ? coberturaConsulta(horario, { dia, desde }) : null;
   return new Map(horario.aulas.map(sala => [sala.codigo, cobertura
-    ? evaluarSala(horario, sala, consulta.dia, consulta.desde, cobertura)
+    ? evaluarSala(horario, sala, dia, desde, cobertura)
     : { sala, estado: 'sin-datos' }]));
 }
 
-export function buscarSalas(horario, { dia, desde, minimo = 0, edificio = '' }) {
+export function buscarSalas(horario, consulta) {
+  const { dia, desde, minimo = 0, edificio = '' } = resolverConsulta(horario, consulta);
   const cobertura = coberturaConsulta(horario, { dia, desde });
   if (!cobertura) return [];
 

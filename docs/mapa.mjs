@@ -98,7 +98,7 @@ export function crearMapa(raiz, datos, horario, periodo) {
     siguiente.textContent = '';
     if (ficha.estado === 'libre') {
       tramo.textContent = 'Libre de ' + hhmm(ficha.libreDesde) + ' a ' + hhmm(ficha.hasta);
-      duracionSala.textContent = descripcionBloques(ficha.completos) + ' · ' + duracion(ficha.minutos) + ' desde la hora consultada';
+      duracionSala.textContent = descripcionBloques(ficha.completos) + ' · quedan ' + duracion(ficha.minutos) + ' sin recreos';
       const [clase] = proximaClaseEnPeriodo(ficha, consultaActual?.fecha, periodo.finDiurno);
       const salto = ficha.proxima.dias;
       if (clase) {
@@ -117,7 +117,7 @@ export function crearMapa(raiz, datos, horario, periodo) {
         duracionSala.textContent = 'Luego libre de ' + hhmm(desde) + ' a ' + hhmm(hasta) + ' · ' + descripcionBloques(bloques);
       }
     } else {
-      tramo.textContent = 'Consulta otro día u hora para ver la disponibilidad.';
+      tramo.textContent = 'Consulta otro día, hora o bloque para ver la disponibilidad.';
     }
   }
 
@@ -267,19 +267,18 @@ export function crearMapa(raiz, datos, horario, periodo) {
   elegirPiso(piso);
 
   return {
-    actualizar(consulta, vigente, aviso) {
+    actualizar(consulta, vigente, momento, aviso) {
       const clave = [consulta.dia, consulta.desde, consulta.fecha, vigente].join('|');
       if (clave !== claveConsulta) {
         consultaActual = consulta;
         claveConsulta = clave;
         estados = evaluarAulas(horario, consulta, vigente);
-        buscar('.mapa-momento').textContent = (consulta.fecha ? 'Ahora · ' : '')
-          + datos.dias[consulta.dia] + ' · ' + hhmm(consulta.desde);
+        buscar('.mapa-momento').textContent = momento;
         actualizarBotones();
       }
       const alerta = buscar('.mapa-aviso');
       alerta.hidden = !aviso;
-      if (aviso) alerta.textContent = aviso;
+      alerta.textContent = aviso;
       buscar('.mapa-leyenda-sin-datos').hidden = vigente;
       buscar('.mapa-minimo').hidden = !consulta.minimo;
     },

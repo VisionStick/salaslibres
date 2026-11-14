@@ -89,7 +89,6 @@ h1, h2, h3, p { margin: 0; }
 .semestre { color: var(--texto-secundario); font-size: 13px; white-space: nowrap; }
 .enlace-boton { border: 0; padding: 5px 0; color: var(--verde); background: transparent; font-weight: 750; }
 .enlace-boton:hover { text-decoration: underline; }
-.enlace-pequeno { padding: 0; font-size: 12px; }
 
 .portada {
   margin-top: 30px;
@@ -136,7 +135,7 @@ h1 { font-size: clamp(40px, 5.3vw, 70px); font-weight: 770; letter-spacing: -.06
 }
 .buscador {
   display: grid;
-  grid-template-columns: 1fr 1fr 1.25fr auto;
+  grid-template-columns: minmax(0, 1fr) minmax(0, .8fr) minmax(0, 1fr) minmax(0, 1.15fr) auto;
   gap: 16px;
   align-items: end;
   margin-top: 18px;
@@ -148,7 +147,6 @@ h1 { font-size: clamp(40px, 5.3vw, 70px); font-weight: 770; letter-spacing: -.06
 }
 .campo { min-width: 0; display: grid; gap: 7px; }
 label { font-size: 13px; font-weight: 740; }
-.etiqueta-hora { display: flex; align-items: center; justify-content: space-between; gap: 5px; }
 input, select {
   width: 100%;
   min-width: 0;
@@ -170,6 +168,7 @@ select { padding-right: 26px; }
 .resultados-cabecera { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; }
 h2 { font-size: clamp(24px, 4vw, 34px); line-height: 1.1; font-weight: 780; letter-spacing: -.05em; }
 .subtitulo { color: var(--texto-secundario); margin-top: 5px; font-size: 14px; }
+.aviso-consulta { margin-top: 9px; color: var(--verde); }
 .orden { display: flex; gap: 8px; align-items: center; white-space: nowrap; }
 .orden label, .origen label { color: var(--texto-secundario); }
 .orden select, .origen select { min-height: 39px; font-size: 13px; background: var(--blanco); }
@@ -281,10 +280,6 @@ dialog::backdrop { background: #1027229c; }
   line-height: 1;
 }
 .cerrar:hover { background: #e4ece2; }
-.opciones-bloque { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
-.opciones-bloque button { display: grid; gap: 3px; padding: 9px 5px; background: var(--papel); color: var(--tinta); border: 1px solid var(--borde); border-radius: 8px; }
-.opciones-bloque button:hover { background: #e1efdd; }
-.opciones-bloque small { font-size: 12px; color: var(--texto-secundario); }
 .datos-semestre { margin-top: 13px; display: grid; gap: 6px; }
 .datos-semestre p { line-height: 1.4; font-size: 13px; }
 dialog details { border-top: 1px solid var(--borde); margin-top: 12px; padding-top: 10px; }
@@ -298,6 +293,10 @@ summary { cursor: pointer; font-size: 13px; font-weight: 730; }
   .buscador { gap: 10px; padding: 14px; }
   .grilla { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+@media (max-width: 740px) {
+  .buscador { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .buscador .buscar { grid-column: 1 / -1; }
+}
 @media (max-width: 630px) {
   .contenedor { width: calc(100% - 24px); }
   .barra { height: 59px; }
@@ -308,8 +307,7 @@ summary { cursor: pointer; font-size: 13px; font-weight: 730; }
   .salto-titulo { display: none; }
   .intro { margin-top: 11px; font-size: 14px; }
   .ahora { margin-top: 16px; }
-  .buscador { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); margin-top: 12px; }
-  .campo-hora .enlace-pequeno { font-size: 11px; }
+  .buscador { margin-top: 12px; }
   input, select { font-size: 16px; padding-left: 8px; }
   .campo select { padding-right: 12px; }
   .buscar { padding-inline: 8px; }
@@ -322,5 +320,4 @@ summary { cursor: pointer; font-size: 13px; font-weight: 730; }
 @media (max-width: 475px) {
   .grilla { grid-template-columns: minmax(0, 1fr); }
   .chip { padding: 7px 11px; }
-  .opciones-bloque { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

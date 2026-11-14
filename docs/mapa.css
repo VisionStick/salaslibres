@@ -34,7 +34,7 @@
 .mapa-dialogo #mapa-semestre { padding-left: 4px; }
 .mapa-consulta {
   display: grid;
-  grid-template-columns: minmax(120px, 175px) minmax(105px, 145px) auto auto;
+  grid-template-columns: minmax(100px, 160px) minmax(93px, 110px) minmax(96px, 133px) auto auto;
   justify-content: start;
   align-items: end;
   gap: 9px;
@@ -232,8 +232,10 @@
     background: var(--blanco);
     border-bottom: 1px solid var(--borde);
   }
-  .mapa-consulta { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 6px; padding-bottom: 8px; }
-  .mapa-consulta .boton { min-height: 37px; }
+  .mapa-consulta { grid-template-columns: minmax(0, 1fr) minmax(68px, .78fr) minmax(102px, 1.16fr); gap: 6px; padding-bottom: 8px; }
+  .mapa-consulta .boton { padding-inline: 8px; }
+  .mapa-consulta select { padding-inline: 8px 4px; }
+  .mapa-consulta .buscar { grid-column: span 2; }
   .mapa-barra { margin-top: 8px; gap: 6px; }
   .mapa-piso { width: 43px; min-height: 43px; }
   .mapa-filtros { width: 100%; gap: 5px; }
@@ -250,6 +252,11 @@
 
 @media (max-width: 630px) {
   .portada-mapa { display: none; }
+}
+@media (max-width: 420px) {
+  .mapa-consulta { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .mapa-consulta .buscar { grid-column: auto; }
+  .mapa-consulta #mapa-ahora { grid-column: 1 / -1; }
 }
 @media (max-width: 360px) {
   .mapa-filtros select { font-size: 14px; }

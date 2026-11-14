@@ -1,17 +1,17 @@
-import { buscarSalas, coberturaConsulta, hhmm, minutos, ordenarSalas, prepararHorario, proximaClaseEnPeriodo, relojCampus } from './disponibilidad.mjs';
+import { buscarSalas, coberturaConsulta, hhmm, minutos, ordenarSalas, prepararHorario, proximaClaseEnPeriodo, relojCampus, resolverConsulta } from './disponibilidad.mjs';
 import { crearMapa, prepararMiniatura } from './mapa.mjs';
 
 const id = nombre => document.getElementById(nombre);
-const dia = id('dia');
-const hora = id('hora');
+const formulario = id('buscar');
+const formularioMapa = id('mapa-consulta');
+const formularios = [formulario, formularioMapa];
+const formulariosEditados = new Set();
 const duracion = id('duracion');
 const orden = id('orden');
 const origen = id('origen');
 const resultado = id('resultados');
 const dialogoMapa = id('dialogo-datos');
-const mapaDia = id('mapa-dia');
-const mapaHora = id('mapa-hora');
-const estado = { edificio: '', modoAhora: false, limite: 12 };
+const estado = { edificio: '', limite: 12 };
 let periodo;
 let datos;
 let horario;
@@ -75,14 +75,16 @@ function prepararFiltros() {
 }
 
 function prepararOpciones() {
-  for (const [i, nombre] of datos.dias.entries()) {
-    opcion(dia, i, nombre);
-    opcion(mapaDia, i, nombre);
+  for (const form of formularios) {
+    for (const [i, nombre] of datos.dias.entries()) opcion(form.elements.dia, i, nombre);
+    for (const bloque of horario.bloques) {
+      opcion(form.elements.bloque, bloque.numero, bloque.numero + ' · ' + bloque.inicio);
+    }
   }
-  opcion(duracion, 0, 'Cualquier duración');
+  opcion(duracion, 0, 'Sin mínimo');
   for (const bloque of horario.bloques) {
     const n = bloque.numero;
-    opcion(duracion, n, n === 1 ? '1 bloque (35 min)' : n + ' bloques');
+    opcion(duracion, n, n === 1 ? '1 bloque' : n + ' bloques');
   }
 
   for (const [clave, referencia] of Object.entries(datos.referencias)) opcion(origen, clave, referencia.nombre);
@@ -93,25 +95,32 @@ function prepararOpciones() {
   origen.append(porSala);
 }
 
-function configurarBloques() {
-  const opciones = id('opciones-bloque');
-  opciones.replaceChildren();
-  const cobertura = horario.cobertura[Number(dia.value)];
-  const disponibles = horario.bloques.filter(bloque => cobertura && bloque.hasta <= cobertura.hasta);
-  if (!disponibles.length) {
-    opciones.append(texto('p', 'Este día no tiene bloques con sala registrada.'));
-    return;
-  }
-  for (const bloque of disponibles) {
-    const item = boton('Bloque ' + bloque.numero, '', () => {
-      estado.modoAhora = false;
-      hora.value = bloque.inicio;
-      id('dialogo-bloques').close();
-      hora.focus();
-    });
-    item.append(texto('small', bloque.inicio + ' – ' + bloque.fin));
-    opciones.append(item);
-  }
+function ajustarModo(form) {
+  const { modo, hora, bloque } = form.elements;
+  const porBloque = modo.value === 'bloque';
+  hora.disabled = porBloque;
+  bloque.disabled = !porBloque;
+  hora.closest('.campo').hidden = porBloque;
+  bloque.closest('.campo').hidden = !porBloque;
+}
+
+function leerHora(valor) {
+  const partes = /^(\d{1,2}):?(\d{2})$/.exec(valor.trim());
+  return partes ? minutos(partes[1].padStart(2, '0') + ':' + partes[2]) : NaN;
+}
+
+function bloqueEn(minuto) {
+  return horario.bloques.find(bloque => bloque.desde <= minuto && minuto < bloque.hasta);
+}
+
+function escribirConsulta(form, consulta) {
+  const { dia, modo, hora, bloque } = form.elements;
+  dia.value = consulta.dia;
+  modo.value = consulta.modo;
+  hora.value = hhmm(consulta.horaConsultada ?? consulta.desde);
+  hora.setCustomValidity('');
+  bloque.value = bloqueEn(consulta.desde)?.numero ?? '';
+  ajustarModo(form);
 }
 
 function describirDatos() {
@@ -197,7 +206,7 @@ function tarjetaSala(ficha, fechaConsulta) {
   if (!ficha.siguienteHoy) tarjeta.querySelector('.franja-etiqueta').textContent = 'Hasta el fin del horario registrado';
 
   const bloques = completos === 1 ? '1 bloque completo' : completos + ' bloques completos';
-  tarjeta.querySelector('.sala-tiempo').textContent = 'Te quedan ' + textoDuracion(ficha.minutos) + ' · ' + bloques;
+  tarjeta.querySelector('.sala-tiempo').textContent = 'Te quedan ' + textoDuracion(ficha.minutos) + ' sin recreos · ' + bloques;
   escribirClase(tarjeta, ficha, fechaConsulta);
   return tarjeta;
 }
@@ -209,7 +218,7 @@ function referenciaActual() {
 
 function mostrar() {
   if (!horario || !estado.consulta) return;
-  const { dia: diaConsulta, desde, minimo, fecha } = estado.consulta;
+  const { dia: diaConsulta, desde, minimo, fecha, horaConsultada, bloqueRecreo } = estado.consulta;
   const cobertura = horario.cobertura[diaConsulta];
   const delSemestre = !fecha || (fecha >= periodo.inicioDiurno && fecha <= periodo.finDiurno);
   const enHorario = delSemestre && Boolean(coberturaConsulta(horario, estado.consulta));
@@ -217,20 +226,26 @@ function mostrar() {
     : !cobertura ? 'No hay horarios con sala registrada para este día.'
     : !enHorario ? 'Horario registrado de ' + hhmm(cobertura.desde) + ' a ' + hhmm(cobertura.hasta) + '.'
     : '';
-  const sector = estado.edificio ? ' · Edificio ' + estado.edificio : '';
-  const contexto = (fecha ? 'Ahora · ' : '') + datos.dias[diaConsulta] + ' · ' + hhmm(desde) + sector;
+  const bloque = horario.bloques.find(bloque => bloque.desde === desde);
+  const momento = [fecha ? 'Ahora' : '', datos.dias[diaConsulta], bloque ? 'Bloque ' + bloque.numero : '', hhmm(desde)]
+    .filter(Boolean).join(' · ');
+  const contexto = momento + (estado.edificio ? ' · Edificio ' + estado.edificio : '');
+  const avisoRecreo = bloqueRecreo ? 'A las ' + hhmm(horaConsultada) + ' hay recreo. Se muestra el bloque '
+    + bloqueRecreo + ', que empieza a las ' + hhmm(desde) + '.' : '';
+  id('aviso-consulta').textContent = enHorario ? avisoRecreo : '';
+  id('aviso-consulta').hidden = !enHorario || !avisoRecreo;
   id('salas').replaceChildren();
   id('pie-resultados').hidden = true;
   id('campo-origen').hidden = orden.value !== 'cercania';
 
   if (dialogoMapa.open) {
-    actualizarMapa(enHorario, avisoMapa);
+    mapa.actualizar(estado.consulta, enHorario, momento, avisoMapa || avisoRecreo);
   }
 
   if (!enHorario) {
     id('resumen').textContent = contexto;
     if (!delSemestre) {
-      mensaje('La fecha está fuera del semestre ' + datos.semestre + '.', 'Puedes consultar el horario semanal guardado con la búsqueda por día y hora.');
+      mensaje('La fecha está fuera del semestre ' + datos.semestre + '.', 'Puedes consultar el horario semanal guardado por hora o bloque.');
     } else if (!cobertura) {
       mensaje('Este día no tiene horarios con sala registrada.', 'Elige un día de lunes a viernes para consultar las aulas del semestre.');
     } else {
@@ -247,7 +262,7 @@ function mostrar() {
     const alternativa = minimo > 0 && buscarSalas(horario, { ...seleccion, minimo: 0 }).length > 0;
     mensaje(
       alternativa ? 'Ninguna sala alcanza esa duración.' : 'No hay salas disponibles para esa búsqueda.',
-      alternativa ? 'Hay salas libres durante menos tiempo.' : 'Prueba con otro día, hora o edificio.',
+      alternativa ? 'Hay salas libres durante menos tiempo.' : 'Prueba con otro día, bloque, hora o edificio.',
       alternativa,
     );
     return;
@@ -260,13 +275,6 @@ function mostrar() {
   id('mas').textContent = 'Mostrar más salas (' + Math.max(0, restantes) + ')';
 }
 
-function actualizarMapa(enHorario, aviso) {
-  const consulta = estado.consulta;
-  mapaDia.value = consulta.dia;
-  mapaHora.value = hhmm(consulta.desde);
-  mapa.actualizar(consulta, enHorario, aviso);
-}
-
 function abrirMapa() {
   if (!horario) return;
   if (!mapa) mapa = crearMapa(dialogoMapa.querySelector('.mapa-interactivo'), datos, horario, periodo);
@@ -274,26 +282,48 @@ function abrirMapa() {
   mostrar();
 }
 
-function buscarAhora(desplazar, forzar = false) {
+function buscarAhora(origen) {
   const reloj = relojCampus(datos.zonaHoraria);
   const desde = minutos(reloj.hora);
-  if (!desplazar && !forzar && estado.consulta?.desde === desde && estado.consulta?.fecha === reloj.fecha) return;
-  dia.value = reloj.dia;
-  hora.value = reloj.hora;
-  estado.modoAhora = true;
-  if (desplazar) estado.limite = 12;
-  estado.consulta = { dia: reloj.dia, desde, fecha: reloj.fecha, minimo: Number(duracion.value) };
+  const anterior = estado.consulta;
+  if (!origen && (anterior.horaConsultada ?? anterior.desde) === desde && anterior.fecha === reloj.fecha) return;
+  const minimo = origen === formulario ? Number(duracion.value) : anterior.minimo;
+  const consulta = { dia: reloj.dia, desde, fecha: reloj.fecha, minimo, modo: 'hora' };
+  if (origen) {
+    aplicarConsulta(consulta, origen === formulario);
+    return;
+  }
+  estado.consulta = resolverConsulta(horario, consulta);
+  for (const form of formularios) {
+    if (!formulariosEditados.has(form)) escribirConsulta(form, estado.consulta);
+  }
+  mostrar();
+}
+
+function aplicarConsulta(consulta, desplazar) {
+  estado.consulta = resolverConsulta(horario, consulta);
+  estado.limite = 12;
+  formulariosEditados.clear();
+  duracion.value = consulta.minimo;
+  for (const form of formularios) escribirConsulta(form, estado.consulta);
   mostrar();
   if (desplazar) irAResultados();
 }
 
-function buscarSeleccion(desplazar) {
-  if (!id('buscar').checkValidity()) return;
-  estado.modoAhora = false;
-  estado.limite = 12;
-  estado.consulta = { dia: Number(dia.value), desde: minutos(hora.value), minimo: Number(duracion.value) };
-  mostrar();
-  if (desplazar) irAResultados();
+function buscarSeleccion(form) {
+  const { dia, modo, hora, bloque } = form.elements;
+  const porBloque = modo.value === 'bloque';
+  const desde = porBloque ? horario.bloques.find(item => item.numero === Number(bloque.value))?.desde : leerHora(hora.value);
+  if (!Number.isFinite(desde)) {
+    if (!porBloque) {
+      hora.setCustomValidity('Escribe una hora de 24 horas, por ejemplo 09:40 o 0940.');
+      hora.reportValidity();
+    }
+    return;
+  }
+  const principal = form === formulario;
+  const minimo = principal ? Number(duracion.value) : estado.consulta.minimo;
+  aplicarConsulta({ dia: Number(dia.value), desde, minimo, modo: modo.value }, principal);
 }
 
 async function obtenerJson(ruta) {
@@ -317,19 +347,19 @@ async function iniciar() {
     const diasConHorario = horario.cobertura.map((ventana, i) => ventana ? i : -1).filter(i => i >= 0);
     const primerDia = diasConHorario.find(i => i >= reloj.dia) ?? diasConHorario[0];
     const primerHorario = horario.cobertura[primerDia];
+    if (!primerHorario) throw new Error('No hay sesiones con sala en el horario');
     const estaEnHorario = primerDia === reloj.dia && minutos(reloj.hora) >= primerHorario.desde
       && minutos(reloj.hora) < primerHorario.hasta;
-    dia.value = primerDia;
-    hora.value = estaEnHorario ? reloj.hora : hhmm(Math.min(minutos('14:40'), primerHorario.hasta - 35));
-    duracion.value = '0';
+    const desde = estaEnHorario ? minutos(reloj.hora)
+      : Math.max(primerHorario.desde, Math.min(minutos('14:40'), primerHorario.hasta - 35));
     id('semestre').textContent = 'Semestre ' + datos.semestre;
     id('semestre').hidden = false;
     id('mapa-semestre').textContent = '· Semestre ' + datos.semestre;
     id('filtros').hidden = false;
-    for (const control of [dia, hora, duracion, orden, id('ahora'), id('enviar'), id('ver-bloques'), id('abrir-datos'), id('abrir-mapa-portada')]) {
+    for (const control of [formulario.elements.dia, formulario.elements.modo, duracion, orden, id('ahora'), id('enviar'), id('abrir-datos'), id('abrir-mapa-portada')]) {
       control.disabled = false;
     }
-    buscarSeleccion(false);
+    aplicarConsulta({ dia: primerDia, desde, minimo: 0, modo: 'hora' }, false);
   } catch (error) {
     console.error(error);
     id('resumen').textContent = '';
@@ -337,43 +367,44 @@ async function iniciar() {
   }
 }
 
-id('buscar').addEventListener('submit', evento => {
-  evento.preventDefault();
-  buscarSeleccion(true);
-});
-id('ahora').addEventListener('click', () => buscarAhora(true));
-for (const control of [dia, hora, duracion]) {
-  control.addEventListener('input', () => { estado.modoAhora = false; });
+for (const form of formularios) {
+  const { dia, modo, hora, bloque } = form.elements;
+  form.addEventListener('submit', evento => {
+    evento.preventDefault();
+    buscarSeleccion(form);
+  });
+  form.addEventListener('input', () => formulariosEditados.add(form));
+  hora.addEventListener('input', () => {
+    hora.setCustomValidity('');
+    bloque.value = '';
+  });
+  modo.addEventListener('change', () => {
+    if (modo.value === 'bloque' && !bloque.value) {
+      const consulta = resolverConsulta(horario, { dia: Number(dia.value), desde: leerHora(hora.value) });
+      bloque.value = bloqueEn(consulta.desde)?.numero ?? '';
+    }
+    ajustarModo(form);
+  });
 }
-id('ver-bloques').addEventListener('click', () => {
-  configurarBloques();
-  id('dialogo-bloques').showModal();
-});
+id('ahora').addEventListener('click', () => buscarAhora(formulario));
 for (const entrada of ['abrir-datos', 'abrir-mapa-portada', 'abrir-mapa-resultados']) {
   id(entrada).addEventListener('click', abrirMapa);
 }
-id('mapa-consulta').addEventListener('submit', evento => {
-  evento.preventDefault();
-  dia.value = mapaDia.value;
-  hora.value = mapaHora.value;
-  buscarSeleccion(false);
-});
-for (const control of [mapaDia, mapaHora]) {
-  control.addEventListener('input', () => { estado.modoAhora = false; });
-}
-id('mapa-ahora').addEventListener('click', () => buscarAhora(false, true));
+id('mapa-ahora').addEventListener('click', () => buscarAhora(formularioMapa));
 orden.addEventListener('change', () => { estado.limite = 12; mostrar(); });
 origen.addEventListener('change', () => { estado.limite = 12; mostrar(); });
 id('menos-tiempo').addEventListener('click', () => {
   duracion.value = '0';
-  buscarSeleccion(false);
+  estado.consulta.minimo = 0;
+  estado.limite = 12;
+  mostrar();
 });
 id('mas').addEventListener('click', () => { estado.limite += 12; mostrar(); });
 setInterval(() => {
-  if (estado.modoAhora && !document.hidden) buscarAhora(false);
+  if (estado.consulta?.fecha && !document.hidden) buscarAhora();
 }, 15000);
 document.addEventListener('visibilitychange', () => {
-  if (estado.modoAhora && !document.hidden) buscarAhora(false);
+  if (estado.consulta?.fecha && !document.hidden) buscarAhora();
 });
 
 await iniciar();
