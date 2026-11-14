@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="es-CL">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#132b29">
+  <meta name="description" content="Busca salas sin clases programadas por día y hora en el campus Santiago San Joaquín de la USM.">
+  <title>Sala Libre · San Joaquín</title>
+  <link rel="icon" type="image/png" href="./icono.png">
+  <link rel="stylesheet" href="./estilos.css">
+  <script type="module" src="./app.mjs"></script>
+</head>
+<body>
+  <a class="salto" href="#buscar">Saltar a la búsqueda</a>
+  <header class="cabecera">
+    <div class="contenedor barra">
+      <a class="marca" href="./" aria-label="Sala Libre, inicio">
+        <span class="marca-icono" aria-hidden="true"><i></i></span>
+        <span>Sala Libre<span class="marca-punto">.</span></span>
+      </a>
+      <div class="barra-acciones">
+        <span class="semestre" id="semestre" hidden></span>
+        <button type="button" class="enlace-boton" id="abrir-datos">Mapa y datos</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="contenedor" id="contenido">
+    <section class="portada" aria-labelledby="titulo">
+      <div class="portada-texto">
+        <p class="campus"><span aria-hidden="true"></span> USM · Santiago San Joaquín</p>
+        <h1 id="titulo">Encuentra una sala<br class="salto-titulo"> para estudiar.</h1>
+        <p class="intro">Revisa qué salas están libres y cuánto tiempo tienes antes de la siguiente clase.</p>
+        <button type="button" class="boton ahora" id="ahora" disabled><span class="icono-reloj" aria-hidden="true"></span> Buscar salas libres ahora</button>
+      </div>
+      <div class="portada-mapa" aria-label="Filtrar por edificio">
+        <div class="plano plano-portada" id="mapa-portada"></div>
+        <p>Elige un edificio en el mapa</p>
+      </div>
+    </section>
+
+    <form id="buscar" class="buscador" aria-label="Buscar por día y hora">
+      <div class="campo">
+        <label for="dia">Día</label>
+        <select id="dia" name="dia" required disabled></select>
+      </div>
+      <div class="campo campo-hora">
+        <div class="etiqueta-hora">
+          <label for="hora">Desde</label>
+          <button type="button" id="ver-bloques" class="enlace-boton enlace-pequeno" disabled>Elegir bloque</button>
+        </div>
+        <input type="time" id="hora" name="hora" required disabled>
+      </div>
+      <div class="campo">
+        <label for="duracion">Duración mínima</label>
+        <select id="duracion" name="duracion" disabled></select>
+      </div>
+      <button type="submit" class="boton buscar" id="enviar" disabled>Buscar salas <span aria-hidden="true">→</span></button>
+    </form>
+
+    <section class="resultados" id="resultados" aria-labelledby="titulo-resultados">
+      <div class="resultados-cabecera">
+        <div>
+          <h2 id="titulo-resultados">Salas disponibles</h2>
+          <p class="subtitulo" id="resumen" role="status" aria-live="polite">Cargando el horario del semestre…</p>
+        </div>
+        <div class="orden">
+          <label for="orden">Ordenar por</label>
+          <select id="orden" disabled>
+            <option value="tiempo">Más tiempo libre</option>
+            <option value="cercania">Cercanía</option>
+            <option value="codigo">Código de sala</option>
+          </select>
+        </div>
+      </div>
+      <div class="filtros" id="filtros" hidden>
+        <div class="edificios" id="edificios" role="group" aria-label="Filtrar por edificio"></div>
+        <div class="origen" id="campo-origen" hidden>
+          <label for="origen">Cerca de</label>
+          <select id="origen" aria-describedby="nota-cercania"></select>
+          <small id="nota-cercania">Cercanía aproximada según el mapa.</small>
+        </div>
+      </div>
+      <div id="mensaje" class="mensaje" hidden>
+        <strong id="mensaje-titulo"></strong>
+        <p id="mensaje-detalle"></p>
+        <button type="button" class="boton boton-secundario" id="menos-tiempo" hidden>Ver salas con menos tiempo</button>
+      </div>
+      <div class="grilla" id="salas"></div>
+      <div class="pie-resultados" id="pie-resultados" hidden>
+        <button type="button" class="boton boton-secundario" id="mas">Mostrar más salas</button>
+      </div>
+    </section>
+
+    <footer class="pie">
+      <span>Disponibilidad según el horario publicado. El acceso, las reservas y los cambios del día pueden variar.</span>
+      <a href="https://alviniscrack.github.io/horario-usm/" target="_blank" rel="noopener noreferrer">Fuente: Horario USM ↗</a>
+    </footer>
+    <noscript><p class="mensaje">Activa JavaScript para consultar el horario y buscar salas.</p></noscript>
+  </main>
+
+  <dialog id="dialogo-bloques" aria-labelledby="titulo-bloques">
+    <div class="dialogo-cabecera">
+      <div>
+        <h2 id="titulo-bloques">Elegir un bloque</h2>
+        <p>Cada bloque numerado dura 35 minutos.</p>
+      </div>
+      <form method="dialog"><button type="submit" class="cerrar" aria-label="Cerrar">×</button></form>
+    </div>
+    <div id="opciones-bloque" class="opciones-bloque"></div>
+  </dialog>
+
+  <dialog id="dialogo-datos" aria-labelledby="titulo-datos">
+    <div class="dialogo-cabecera">
+      <div>
+        <h2 id="titulo-datos">Mapa y datos</h2>
+        <p>Campus Santiago San Joaquín</p>
+      </div>
+      <form method="dialog"><button type="submit" class="cerrar" aria-label="Cerrar">×</button></form>
+    </div>
+    <div class="plano plano-dialogo" id="mapa-dialogo" aria-label="Edificios del campus"></div>
+    <p class="nota-mapa">Ubicaciones aproximadas a partir de «Soy el mapa». Elige un edificio para filtrar la búsqueda.</p>
+    <div class="datos-semestre" id="datos-semestre"></div>
+    <details id="revision">
+      <summary>Espacios por revisar</summary>
+      <ul class="lista-datos" id="lista-revision"></ul>
+    </details>
+    <details id="solo-mapa">
+      <summary>Salas que figuran solo en el mapa</summary>
+      <ul class="lista-datos" id="lista-mapa"></ul>
+    </details>
+  </dialog>
+
+  <template id="plantilla-sala">
+    <article class="sala">
+      <div class="sala-cabecera">
+        <div>
+          <p class="ubicacion"></p>
+          <h3 class="codigo"></h3>
+        </div>
+        <span class="conveniencia"><i aria-hidden="true"></i><span></span></span>
+      </div>
+      <p class="ubicacion-nota" hidden></p>
+      <div class="franja">
+        <span class="franja-etiqueta">Franja sin clases</span>
+        <p class="franja-horas"><time></time> <span aria-hidden="true">–</span><span class="solo-lector"> a </span> <time></time></p>
+      </div>
+      <p class="sala-tiempo"></p>
+      <div class="proxima">
+        <span class="proxima-etiqueta"></span>
+        <p class="proxima-clase"></p>
+        <details class="proxima-mas" hidden><summary></summary><ul></ul></details>
+      </div>
+    </article>
+  </template>
+</body>
+</html>

@@ -1,0 +1,140 @@
+export function minutos(hora) {
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(hora ?? '')) return NaN;
+  const [h, m] = hora.split(':').map(Number);
+  return h * 60 + m;
+}
+
+export function hhmm(valor) {
+  return [Math.floor(valor / 60), valor % 60].map(n => String(n).padStart(2, '0')).join(':');
+}
+
+export function relojCampus(zonaHoraria, fecha = new Date()) {
+  const partes = new Intl.DateTimeFormat('en-CA', {
+    timeZone: zonaHoraria,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  }).formatToParts(fecha);
+  const valor = Object.fromEntries(partes.map(({ type, value }) => [type, value]));
+  const fechaLocal = [valor.year, valor.month, valor.day].join('-');
+  const dia = (new Date(fechaLocal + 'T00:00:00Z').getUTCDay() + 6) % 7;
+  return { fecha: fechaLocal, dia, hora: valor.hour + ':' + valor.minute };
+}
+
+const ordenarCodigo = new Intl.Collator('es-CL', { numeric: true });
+
+export function prepararHorario(datos) {
+  const bloques = datos.bloques.map(bloque => ({
+    ...bloque, desde: minutos(bloque.inicio), hasta: minutos(bloque.fin),
+  }));
+  const cobertura = Array.from({ length: datos.dias.length }, () => null);
+  const porSala = new Map(datos.salas.map(sala => [
+    sala.codigo, Array.from({ length: datos.dias.length }, () => []),
+  ]));
+
+  for (const turno of [...datos.oferta, ...datos.ocupacionesAdicionales]) {
+    for (const ramo of turno.ramos) {
+      for (const paralelo of ramo.paralelos) {
+        const clases = new Map();
+        for (const fila of paralelo.horario) {
+          if (!fila.enSanJoaquin || !porSala.has(fila.sala)) continue;
+          const clave = JSON.stringify([fila.sala, fila.dia, fila.tipo, fila.profesor]);
+          if (!clases.has(clave)) clases.set(clave, []);
+          clases.get(clave).push(fila);
+        }
+
+        for (const clase of clases.values()) {
+          const { sala, dia, tipo, profesor } = clase[0];
+          const ocupaciones = porSala.get(sala)[dia];
+          let sesion;
+          for (const fila of clase.sort((a, b) => a.bloque - b.bloque)) {
+            const desde = minutos(fila.inicio);
+            const hasta = minutos(fila.fin);
+            if (sesion && fila.bloque <= sesion.ultimoBloque + 1 && desde - sesion.hasta <= 15) {
+              sesion.hasta = Math.max(sesion.hasta, hasta);
+              sesion.ultimoBloque = Math.max(sesion.ultimoBloque, fila.bloque);
+            } else {
+              sesion = {
+                desde, hasta, ultimoBloque: fila.bloque, dia, tipo, profesor,
+                sigla: ramo.sigla, nombre: paralelo.nombre ?? ramo.nombre,
+                paralelo: paralelo.numero, sede: turno.sede ?? datos.sede,
+              };
+              ocupaciones.push(sesion);
+            }
+            cobertura[dia] ??= { desde: bloques[0].desde, hasta: 0 };
+            cobertura[dia].hasta = Math.max(cobertura[dia].hasta, hasta);
+          }
+        }
+      }
+    }
+  }
+
+  for (const semana of porSala.values()) {
+    for (const sesiones of semana) {
+      sesiones.sort((a, b) => a.desde - b.desde || ordenarCodigo.compare(a.sigla, b.sigla));
+    }
+  }
+  return { bloques, cobertura, porSala, aulas: datos.salas.filter(sala => sala.estado === 'aula') };
+}
+
+function clasesQueEmpiezan(sesiones) {
+  return sesiones.filter(sesion => sesion.desde === sesiones[0]?.desde);
+}
+
+function proximaClase(semana, dia, desde) {
+  const hoy = semana[dia].filter(sesion => sesion.desde > desde);
+  if (hoy.length) return { clases: clasesQueEmpiezan(hoy), dias: 0 };
+  for (let salto = 1; salto <= semana.length; salto += 1) {
+    const siguiente = semana[(dia + salto) % semana.length];
+    if (siguiente.length) return { clases: clasesQueEmpiezan(siguiente), dias: salto };
+  }
+  return { clases: [], dias: null };
+}
+
+export function buscarSalas(horario, { dia, desde, minimo = 0, edificio = '' }) {
+  const cobertura = horario.cobertura[dia];
+  if (!cobertura || !Number.isFinite(desde) || desde < cobertura.desde || desde >= cobertura.hasta) return [];
+
+  const resultados = [];
+  for (const sala of horario.aulas) {
+    if (edificio && sala.edificio !== edificio) continue;
+    const semana = horario.porSala.get(sala.codigo);
+    const sesiones = semana[dia];
+    if (sesiones.some(sesion => sesion.desde <= desde && desde < sesion.hasta)) continue;
+
+    const proxima = proximaClase(semana, dia, desde);
+    const siguienteHoy = proxima.dias === 0 ? proxima.clases[0] : null;
+    const hasta = siguienteHoy?.desde ?? cobertura.hasta;
+    const libreDesde = sesiones.reduce(
+      (inicio, sesion) => sesion.hasta <= desde ? Math.max(inicio, sesion.hasta) : inicio,
+      cobertura.desde,
+    );
+    const completos = horario.bloques.filter(bloque => bloque.desde >= desde && bloque.hasta <= hasta).length;
+    if (completos < minimo) continue;
+    resultados.push({ sala, libreDesde, hasta, completos, minutos: hasta - desde, proxima, siguienteHoy });
+  }
+  return resultados;
+}
+
+function distancia(sala, origen) {
+  if (sala.codigo === origen.codigo) return 0;
+  if (!sala.punto || !origen.punto) return Infinity;
+  return Math.hypot(
+    sala.punto[0] - origen.punto[0],
+    sala.punto[1] - origen.punto[1],
+    75 * Math.abs((sala.piso ?? 1) - (origen.piso ?? 1)),
+  );
+}
+
+export function ordenarSalas(salas, orden, origen) {
+  return [...salas].sort((a, b) => {
+    if (orden === 'cercania' && origen) {
+      const diferencia = distancia(a.sala, origen) - distancia(b.sala, origen);
+      if (diferencia) return diferencia;
+    }
+    if (orden !== 'codigo') {
+      const diferencia = b.minutos - a.minutos || b.completos - a.completos;
+      if (diferencia) return diferencia;
+    }
+    return ordenarCodigo.compare(a.sala.codigo, b.sala.codigo);
+  });
+}

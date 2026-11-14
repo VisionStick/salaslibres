@@ -1,0 +1,91 @@
+{
+  "sede": "Santiago San Joaquín",
+  "zonaHoraria": "America/Santiago",
+  "mapa": {
+    "referencia": "Soy el mapa",
+    "pixelesPorPlano": [1275, 1650],
+    "salas": {
+      "A001": [1, 630, 774], "A002": [1, 585, 775], "A003": [1, 543, 775], "A004": [1, 346, 870],
+      "A005": [1, 380, 870], "A006": [1, 414, 870], "A007": [1, 449, 870], "A008": [1, 484, 870],
+      "A009": [1, 556, 865], "A010": [1, 590, 865], "A011": [1, 625, 865], "A012": [1, 580, 935],
+      "A013": [1, 550, 935], "A014": [1, 520, 935], "A015": [1, 485, 935], "A016": [1, 306, 870],
+      "A017": [1, 479, 772],
+      "B001": [1, 1136, 684], "B002": [1, 1136, 661], "B003": [1, 1132, 615], "B004": [1, 1132, 578],
+      "B005": [1, 1132, 541], "B006": [1, 1132, 506], "B007": [1, 1132, 470], "B008": [1, 1132, 433],
+      "B009": [1, 1132, 378], "B010": [1, 1132, 343], "B013": [1, 1121, 780], "B014": [1, 1121, 750],
+      "B021": [1, 896, 577], "B022": [1, 973, 577], "B023": [1, 1046, 577], "B031": [1, 874, 431],
+      "B033": [1, 898, 431], "B035": [1, 926, 431], "B037": [1, 953, 431], "B038": [1, 947, 496],
+      "B039": [1, 989, 429], "B041": [1, 1059, 429], "B044": [1, 978, 496], "B064": [1, 1024, 388],
+      "B065": [1, 1024, 346],
+      "B201": [2, 1160, 691], "B202": [2, 1138, 691], "B203": [2, 1118, 691],
+      "E201": [2, 1021, 156], "E202": [2, 980, 156], "E203": [2, 939, 156],
+      "F310": [3, 803, 634], "F325": [3, 678, 924],
+      "F400": [4, 806, 587], "F401": [4, 806, 553], "F402": [4, 806, 520], "F403": [4, 705, 589],
+      "F404": [4, 705, 555], "F405": [4, 705, 521], "F406": [4, null, null], "F407": [4, 783, 769],
+      "F408": [4, 675, 767], "F409": [4, 675, 734], "F410": [4, 721, 744], "F425": [4, 678, 904],
+      "K100": [1, 212, 381], "K101": [1, 202, 417], "K102": [1, 192, 453],
+      "K200": [2, 222, 385], "K201": [2, 213, 423], "K202": [2, 202, 459], "K203": [2, 199, 564],
+      "K300": [3, 204, 387], "K301": [3, 195, 424], "K302": [3, 187, 460], "K303": [3, 178, 537],
+      "K304": [3, 178, 574], "K305": [3, 178, 667], "K306": [3, 178, 705], "K307": [3, 183, 729],
+      "K400": [4, 208, 382], "K401": [4, 197, 419], "K402": [4, 189, 455], "K403": [4, 183, 532],
+      "K404": [4, 183, 570], "K405": [4, 190, 663], "K406": [4, 190, 701]
+    }
+  },
+  "edificios": {
+    "A": {"nombre": "Edificio A", "piso": 1, "punto": [454, 870]},
+    "B": {"nombre": "Edificio B", "piso": 1, "punto": [1116, 560]},
+    "E": {"nombre": "Edificio E", "piso": 2, "punto": [981, 155]},
+    "F": {"nombre": "Edificio F", "piso": 1, "punto": [755, 695]},
+    "K": {"nombre": "Edificio K", "piso": 1, "punto": [218, 508]}
+  },
+  "referencias": {
+    "biblioteca": {"nombre": "Biblioteca", "piso": 2, "punto": [775, 913]},
+    "patio": {"nombre": "Patio de las Lámparas", "piso": 1, "punto": [751, 690]},
+    "entrada": {"nombre": "Acceso Vicuña Mackenna", "piso": 1, "punto": [700, 1008]}
+  },
+  "exclusiones": ["B021", "B022", "B023", "B038", "B044", "B031", "B033", "B035", "B037", "B039", "B041", "B065", "B014", "B013", "K303", "K304", "B305", "B306", "K307", "K405", "K406", "K404", "K403"],
+  "excepcionesSubterraneo": [],
+  "alias": {
+    "B008 LAB-GRAFICA MEC": "B008",
+    "-QUIMICA B064-SJ 1": "B064",
+    "-QUIMICA B065-SJ 2": "B065",
+    "-AUTOMATIZACIÓN": "Laboratorio de Automatización",
+    "-CONVERSION-ELECTROMECANICA-SJ": "Laboratorio de Conversión Electromecánica",
+    "-MEDICIONES-SJ": "Laboratorio de Mediciones",
+    "-METALMECANICO- SJ": "Taller Metalmecánico",
+    "-TERMOHIDRAULICA-SJ": "Laboratorio de Termohidráulica",
+    "-TUMA VITACURA": "TUMA Vitacura",
+    "CANCHA FUTBOL-SJ": "Cancha de fútbol",
+    "DE ALTA TENSION ELECTRICA": "Laboratorio de Alta Tensión",
+    "DE PROYECTOS MEC SJ": "Espacio de Proyectos Mecánicos",
+    "ELECTRICIDAD SJ": "Laboratorio de Electricidad",
+    "FISICA SJ": "Espacio de Física",
+    "GEOCIENCIAS": "Espacio de Geociencias",
+    "GIMNASIO CANCHA 1-SJ": "Gimnasio · Cancha 1",
+    "GIMNASIO CANCHA 2-SJ": "Gimnasio · Cancha 2",
+    "HIDROMETALURGIA": "Laboratorio de Hidrometalurgia",
+    "MICROBIOLOGIA IQA SJ": "Espacio de Microbiología IQA",
+    "OTARIO DE PROCESOS": "Laboratorio de Procesos",
+    "REUNIONES IQA": "Sala de Reuniones IQA"
+  },
+  "revision": {
+    "B008": "La fuente la llama Lab. Gráfica Mecánica.",
+    "B022A": "El horario usa este subcódigo y el mapa muestra B022, una sala indicada para excluir.",
+    "B022B": "El horario usa este subcódigo y el mapa muestra B022, una sala indicada para excluir.",
+    "B023A": "El horario usa este subcódigo y el mapa muestra B023, una sala indicada para excluir.",
+    "B023B": "El horario usa este subcódigo y el mapa muestra B023, una sala indicada para excluir.",
+    "B049": "El Departamento de Informática la identifica como Laboratorio de Redes y Ciberseguridad.",
+    "B064": "El horario la identifica como laboratorio de Química.",
+    "B114-A": "Tiene clases de Astronomía Computacional. Su tipo y ubicación exacta requieren confirmación.",
+    "K203": "El Departamento de Informática la identifica como Laboratorio de Data Science.",
+    "K204": "El Departamento de Informática la identifica como Laboratorio de Experiencia Usuaria.",
+    "K305": "El mapa dice K305. B305 figura en la lista de exclusión y el horario de K305 incluye laboratorios.",
+    "K306": "El mapa dice K306. B306 figura en la lista de exclusión y el horario de K306 incluye laboratorios.",
+    "TUMA Vitacura": "El nombre indica Vitacura y el campo campus dice San Joaquín. La sede requiere confirmación."
+  },
+  "ubicacionesPorConfirmar": {
+    "K204": {"piso": 2, "nota": "El piso se deduce del código y la ubicación exacta requiere confirmación."},
+    "F406": {"piso": 4, "nota": "El mapa muestra el código F406 en dos puntos del piso 4."},
+    "F411": {"piso": 4, "nota": "El horario usa F411 para clases regulares. El piso se deduce del código y la ubicación exacta requiere confirmación."}
+  }
+}
