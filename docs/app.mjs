@@ -130,7 +130,7 @@ function describirDatos() {
   id('nota-horario').hidden = false;
   id('datos-semestre').append(
     texto('p', 'Semestre ' + datos.semestre + ' · Horario del ' + actualizado),
-    texto('p', numero.format(info.ramos) + ' ramos · ' + numero.format(info.paralelos) + ' paralelos · ' + info.aulasConsultables + ' aulas consultables.'),
+    texto('p', numero.format(info.ramos) + ' ramos · ' + numero.format(info.paralelos) + ' paralelos · ' + info.aulasConsultables + ' aulas con clases publicadas.'),
     texto('p', 'Incluye clases vespertinas con sala identificada en San Joaquín. Hay ' + info.paralelosSinHorario + ' paralelos sin horario y ' + info.bloquesSinSalaEnSanJoaquin + ' bloques locales sin sala publicada.'),
   );
   const descarga = texto('a', 'Descargar el horario completo (JSON)');
@@ -150,7 +150,7 @@ function describirDatos() {
   }
 
   id('revision').querySelector('summary').textContent = 'Espacios por revisar (' + info.espaciosPorRevisar + ')';
-  id('solo-mapa').querySelector('summary').textContent = 'Salas que figuran solo en el mapa (' + info.espaciosSoloMapa + ')';
+  id('solo-mapa').querySelector('summary').textContent = 'Salas sin horario publicado (' + info.espaciosSoloMapa + ')';
   for (const sala of datos.salas) {
     if (!['revision', 'solo_mapa'].includes(sala.estado)) continue;
     const item = texto('li', sala.codigo);
@@ -177,8 +177,9 @@ function escribirClase(tarjeta, ficha, fechaConsulta) {
     return;
   }
   const diaSiguiente = dias ? datos.dias[proxima.dia] + (dias === 7 ? ' siguiente ' : ' ') : '';
-  etiqueta.textContent = 'Próxima clase · ' + diaSiguiente + hhmm(proxima.desde);
-  const detalle = item => item.sigla + ' P' + item.paralelo + ' · ' + item.nombre;
+  etiqueta.textContent = (proxima.reportada ? 'Uso reportado' : 'Próxima clase') + ' · ' + diaSiguiente + hhmm(proxima.desde);
+  const detalle = item => item.reportada ? item.sigla + ' · Hora de término por confirmar'
+    : item.sigla + ' P' + item.paralelo + ' · ' + item.nombre;
   clase.textContent = detalle(proxima);
   const extra = clases.slice(1);
   if (extra.length) {
@@ -189,7 +190,7 @@ function escribirClase(tarjeta, ficha, fechaConsulta) {
   }
 }
 
-function tarjetaSala(ficha, diaConsulta, fechaConsulta) {
+function tarjetaSala(ficha, fechaConsulta) {
   const tarjeta = id('plantilla-sala').content.firstElementChild.cloneNode(true);
   const { sala, libreDesde, hasta, completos } = ficha;
   const piso = sala.piso == null ? '' : ' · Piso ' + sala.piso;
@@ -203,9 +204,7 @@ function tarjetaSala(ficha, diaConsulta, fechaConsulta) {
   }
 
   const etiqueta = tarjeta.querySelector('.conveniencia');
-  const sinClasesDia = !horario.porSala.get(sala.codigo)[diaConsulta].length;
   const nivel = completos >= 3 ? 'Muy conveniente' : completos === 2 ? 'Tiempo acotado' : 'Poco tiempo';
-  etiqueta.hidden = sinClasesDia;
   if (completos < 3) etiqueta.classList.add('media');
   etiqueta.lastElementChild.textContent = nivel;
 
@@ -214,9 +213,7 @@ function tarjetaSala(ficha, diaConsulta, fechaConsulta) {
     tiempos[i].dateTime = hhmm(tiempo);
     tiempos[i].textContent = hhmm(tiempo);
   }
-  const franja = tarjeta.querySelector('.franja-etiqueta');
-  if (sinClasesDia) franja.textContent = 'Sin clases registradas ese día';
-  else if (!ficha.siguienteHoy) franja.textContent = 'Hasta el fin del horario registrado';
+  if (!ficha.siguienteHoy) tarjeta.querySelector('.franja-etiqueta').textContent = 'Hasta el fin del horario registrado';
 
   const bloques = completos === 1 ? '1 bloque completo' : completos + ' bloques completos';
   tarjeta.querySelector('.sala-tiempo').textContent = 'Te quedan ' + textoDuracion(ficha.minutos) + ' sin recreos · ' + bloques;
@@ -286,7 +283,7 @@ function mostrar() {
   }
 
   mensaje('', '');
-  id('salas').append(...opciones.slice(0, estado.limite).map(ficha => tarjetaSala(ficha, diaConsulta, fecha)));
+  id('salas').append(...opciones.slice(0, estado.limite).map(ficha => tarjetaSala(ficha, fecha)));
   const restantes = cantidad - estado.limite;
   id('pie-resultados').hidden = restantes <= 0;
   id('mas').textContent = 'Mostrar más salas (' + Math.max(0, restantes) + ')';
@@ -354,7 +351,7 @@ async function iniciar() {
     periodo = await obtenerJson('./data/periodo.json');
     datos = await obtenerJson('./data/horario-' + periodo.semestre + '.json');
     if (datos.version !== 1 || datos.semestre !== periodo.semestre) throw new Error('Versión de datos inválida');
-    horario = prepararHorario(datos);
+    horario = prepararHorario(datos, periodo.ocupacionesReportadas?.[periodo.semestre]);
     prepararOpciones();
     prepararFiltros();
     prepararMiniatura(id('mapa-portada'));

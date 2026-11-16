@@ -22,9 +22,9 @@ La [página Horario USM](https://alviniscrack.github.io/horario-usm/) muestra 51
 | Bloques locales sin sala identificada | 21 |
 | Bloques adicionales con sala en San Joaquín, publicados en Santiago (Vesp. JMC) | 177 |
 | Espacios con horario de San Joaquín en la fuente | 100 |
-| Aulas consultables | 53 |
+| Aulas con clases publicadas | 53 |
 | Espacios por revisar, conservados en el inventario | 30 |
-| Salas que figuran solo en el mapa, sin horario asociado | 6 |
+| Salas del mapa con disponibilidad por confirmar | 6 |
 
 Las coincidencias de sala, día y bloque entre paralelos conservan todos los registros y se consideran ocupadas. Hay cuatro bloques del catálogo cuya sede de clase figura en Valparaíso. El registro de TUMA Vitacura tiene etiquetas de sede que discrepan y está marcado para revisión.
 
@@ -35,7 +35,8 @@ Las coincidencias de sala, día y bloque entre paralelos conservan todos los reg
 - La franja se acota al primer bloque y a la última clase con sala registrada ese día en el campus. La próxima clase puede aparecer en otro día de la semana. «Ahora» usa la hora de Santiago y las fechas diurnas del [calendario académico](https://dee.usm.cl/calendario-academico-estudiantes/). La consulta semanal sigue disponible para consultar períodos anteriores.
 - El orden por cercanía usa la posición aproximada en los cuatro planos de «Soy el mapa» y el cambio de piso. F411 está junto a F405 y F402, en el cuarto piso del edificio F, según la referencia indicada por el usuario. F406 figura dos veces en el mapa y requiere confirmar su ubicación exacta.
 - Los códigos indicados por el usuario y las salas KS quedan excluidos. Los subcódigos B022A, B022B, B023A y B023B están en revisión. El mapa y el horario dicen K305 y K306 donde la lista menciona B305 y B306. Los cuatro códigos quedan documentados. [Informática USM identifica B049, K203 y K204 como laboratorios](https://informatica.usm.cl/noticias/inauguracion-laboratorios-san-joaquin/).
-- Los resultados muestran salas sin clase programada. El mapa permite consultar todas las clases publicadas de cada sala para el día elegido. El buscador y el mapa avisan cuando el bloque contiene alguna clase a la que la fuente no le asigna sala.
+- El buscador sugiere salas con clases publicadas para el día consultado y una franja sin clase. El mapa indica en gris las salas cuyo horario para ese día está por confirmar. El buscador y el mapa avisan cuando el bloque contiene alguna clase a la que la fuente no le asigna sala.
+- Los reportes de ocupación se guardan por semestre, día y bloque en `docs/data/periodo.json`. En 2026-2 se reportó FIS100 el lunes a las 17:30 en K402. Horario USM publica los paralelos 200 y 201 en A015 y F401 en ese bloque. El mapa señala el uso de K402 en el bloque informado y deja su horario restante por confirmar, incluida la hora de término de la clase.
 
 ## Actualizar el semestre
 

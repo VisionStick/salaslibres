@@ -13,6 +13,13 @@ export function colorSala(ficha) {
   return ficha.completos > 2 ? 'larga' : 'corta';
 }
 
+function tituloSala(ficha) {
+  if (ficha?.reporte) return 'Uso reportado';
+  if (ficha?.sinHorarioDelDia) return 'Horario por confirmar';
+  if (ficha?.estado === 'libre') return 'Sin clase programada';
+  return ESTADOS[ficha?.estado ?? 'sin-datos'].titulo;
+}
+
 const porPiso = (lista, piso) => lista.filter(sala => sala.piso === piso);
 
 function elemento(nombre, clase, contenido) {
@@ -59,10 +66,11 @@ export function crearMapa(raiz, datos, horario, periodo) {
   const horarioSala = buscar('.mapa-horario');
   const mini = matchMedia('(max-width: 640px)');
   const detalleAbajo = matchMedia('(max-width: 850px)');
-  const niveles = [...new Set(horario.aulas.map(sala => sala.piso))].sort((a, b) => a - b);
+  const { salasMapa } = horario;
+  const niveles = [...new Set(salasMapa.map(sala => sala.piso))].sort((a, b) => a - b);
   const botonesPiso = new Map();
   const botonesSala = new Map();
-  const salas = new Map(horario.aulas.map(sala => [sala.codigo, sala]));
+  const salas = new Map(salasMapa.map(sala => [sala.codigo, sala]));
   const ubicacionEnPlano = sala => POSICIONES[sala.codigo];
   let piso = niveles[0];
   let seleccion = '';
@@ -81,16 +89,19 @@ export function crearMapa(raiz, datos, horario, periodo) {
     if (!ficha) return;
 
     const { sala } = ficha;
-    const sesiones = ficha.estado === 'sin-datos' ? [] : horario.porSala.get(codigo)[consultaActual.dia];
+    const sesiones = ficha.estado !== 'sin-datos' || ficha.sinHorarioDelDia
+      ? horario.porSala.get(codigo)[consultaActual.dia] : [];
     if (sesionesMostradas !== sesiones) {
       sesionesMostradas = sesiones;
       horarioSala.open = false;
       horarioSala.hidden = !sesiones.length;
       horarioSala.querySelector('ul').replaceChildren(...sesiones.map(clase => {
         const fila = elemento('li', '');
+        const hora = hhmm(clase.desde);
         fila.append(
-          elemento('strong', '', hhmm(clase.desde) + ' – ' + hhmm(clase.hasta)),
-          elemento('span', '', clase.sigla + ' P' + clase.paralelo + ' · ' + clase.nombre),
+          elemento('strong', '', clase.reportada ? 'Desde las ' + hora : hora + ' – ' + hhmm(clase.hasta)),
+          elemento('span', '', clase.reportada ? clase.sigla + ' · Uso reportado · Término por confirmar'
+            : clase.sigla + ' P' + clase.paralelo + ' · ' + clase.nombre),
         );
         return fila;
       }));
@@ -99,7 +110,7 @@ export function crearMapa(raiz, datos, horario, periodo) {
     const etiqueta = detalle.querySelector('.mapa-estado');
     etiqueta.dataset.color = color;
     etiqueta.firstElementChild.textContent = ESTADOS[color].icono;
-    etiqueta.lastElementChild.textContent = ficha.estado === 'libre' ? 'Sin clase programada' : ESTADOS[color].titulo;
+    etiqueta.lastElementChild.textContent = tituloSala(ficha);
     buscar('.mapa-detalle-codigo').textContent = sala.codigo;
     buscar('.mapa-detalle-ubicacion').textContent = 'Edificio ' + sala.edificio + ' · Piso ' + sala.piso;
     const referencia = buscar('.mapa-detalle-referencia');
@@ -112,19 +123,22 @@ export function crearMapa(raiz, datos, horario, periodo) {
     const siguiente = buscar('.mapa-detalle-clase');
     duracionSala.textContent = '';
     siguiente.textContent = '';
-    if (ficha.estado === 'libre') {
+    if (ficha.reporte) {
+      tramo.textContent = ficha.reporte.sigla + ' · Desde las ' + hhmm(ficha.reporte.desde);
+      duracionSala.textContent = 'Hora de término por confirmar';
+    } else if (ficha.estado === 'libre') {
       tramo.textContent = 'Sin clase de ' + hhmm(ficha.libreDesde) + ' a ' + hhmm(ficha.hasta);
       duracionSala.textContent = descripcionBloques(ficha.completos) + ' · quedan ' + duracion(ficha.minutos) + ' sin recreos';
       const [clase] = proximaClaseEnPeriodo(ficha, consultaActual?.fecha, periodo.finDiurno);
       const salto = ficha.proxima.dias;
       if (clase) {
         const dia = salto ? datos.dias[clase.dia] + (salto === 7 ? ' siguiente ' : ' ') : '';
-        siguiente.textContent = 'Próxima clase · ' + dia + hhmm(clase.desde) + ' · ' + clase.nombre;
+        const encabezado = clase.reportada ? 'Uso reportado · ' : 'Próxima clase · ';
+        siguiente.textContent = encabezado + dia + hhmm(clase.desde) + ' · ' + (clase.nombre ?? clase.sigla);
       } else {
         siguiente.textContent = 'Sin otra clase programada';
       }
-      if (!sesiones.length) siguiente.textContent += ' · Sin clases registradas ese día';
-      else if (!ficha.siguienteHoy) siguiente.textContent += ' · Franja hasta el fin del horario registrado';
+      if (!ficha.siguienteHoy) siguiente.textContent += ' · Franja hasta el fin del horario registrado';
     } else if (ficha.estado === 'ocupada') {
       tramo.textContent = 'Con clases hasta las ' + hhmm(ficha.hasta);
       siguiente.textContent = ficha.enCurso.map(clase => clase.nombre).join(' · ');
@@ -132,6 +146,12 @@ export function crearMapa(raiz, datos, horario, periodo) {
         const { desde, hasta } = ficha.proximaLibre;
         const bloques = contarBloques(horario.bloques, desde, hasta);
         duracionSala.textContent = 'Luego sin clase de ' + hhmm(desde) + ' a ' + hhmm(hasta) + ' · ' + descripcionBloques(bloques);
+      }
+    } else if (ficha.sinHorarioDelDia) {
+      tramo.textContent = 'Disponibilidad por confirmar para esta hora.';
+      const reporteDelDia = sesiones.find(clase => clase.reportada);
+      if (reporteDelDia) {
+        siguiente.textContent = reporteDelDia.sigla + ' · Uso reportado a las ' + hhmm(reporteDelDia.desde);
       }
     } else {
       tramo.textContent = 'Consulta otro día, hora o bloque para ver la disponibilidad.';
@@ -146,7 +166,8 @@ export function crearMapa(raiz, datos, horario, periodo) {
       boton.dataset.color = color;
       boton.lastElementChild.textContent = marca.icono;
       boton.setAttribute('aria-pressed', String(codigo === seleccion));
-      const textoEstado = ficha?.estado === 'libre' ? 'Sin clase programada · ' + descripcionBloques(ficha.completos) : marca.titulo;
+      const bloques = ficha?.estado === 'libre' ? ' · ' + descripcionBloques(ficha.completos) : '';
+      const textoEstado = tituloSala(ficha) + bloques;
       boton.setAttribute('aria-label', codigo + ', ' + textoEstado);
     }
     actualizarDetalle(vistaPrevia || seleccion);
@@ -202,7 +223,7 @@ export function crearMapa(raiz, datos, horario, periodo) {
   }
 
   function renderPlano() {
-    const salasPiso = porPiso(horario.aulas, piso);
+    const salasPiso = porPiso(salasMapa, piso);
     vista = SECTORES[sector.value] ?? CAMPUS;
     const salasVisibles = sector.value ? salasPiso.filter(sala => sala.edificio === sector.value) : salasPiso;
     activos = new Set(salasVisibles.map(sala => sala.edificio));
@@ -227,7 +248,7 @@ export function crearMapa(raiz, datos, horario, periodo) {
   function elegirPiso(nivel, edificio) {
     piso = nivel;
     vistaPrevia = '';
-    const edificios = [...new Set(porPiso(horario.aulas, piso).map(sala => sala.edificio))].sort();
+    const edificios = [...new Set(porPiso(salasMapa, piso).map(sala => sala.edificio))].sort();
     sector.replaceChildren(opcion('', 'Todo el campus'), ...edificios.map(codigo => opcion(codigo, 'Edificio ' + codigo)));
     sector.value = edificios.includes(edificio) ? edificio : mini.matches ? edificios[0] : '';
     const salaSeleccionada = salas.get(seleccion);
@@ -248,7 +269,7 @@ export function crearMapa(raiz, datos, horario, periodo) {
     pisos.append(boton);
     const grupo = elemento('optgroup', '');
     grupo.label = 'Piso ' + nivel;
-    for (const sala of porPiso(horario.aulas, nivel)) grupo.append(opcion(sala.codigo, sala.codigo));
+    for (const sala of porPiso(salasMapa, nivel)) grupo.append(opcion(sala.codigo, sala.codigo));
     buscarSala.append(grupo);
   }
 
@@ -291,12 +312,12 @@ export function crearMapa(raiz, datos, horario, periodo) {
         claveConsulta = clave;
         estados = evaluarAulas(horario, consulta, vigente);
         buscar('.mapa-momento').textContent = momento;
+        buscar('.mapa-leyenda-sin-datos').hidden = ![...estados.values()].some(ficha => ficha.estado === 'sin-datos');
         actualizarBotones();
       }
       const alerta = buscar('.mapa-aviso');
       alerta.hidden = !aviso;
       alerta.textContent = aviso;
-      buscar('.mapa-leyenda-sin-datos').hidden = vigente;
       buscar('.mapa-minimo').hidden = !consulta.minimo;
     },
   };

@@ -6,17 +6,19 @@ import { colorSala } from '../docs/mapa.mjs';
 import { CAMPUS, POSICIONES, SECTORES } from '../docs/plano-campus.mjs';
 
 const datos = JSON.parse(readFileSync(new URL('../docs/data/horario-2026-2.json', import.meta.url)));
-const horario = prepararHorario(datos);
+const periodo = JSON.parse(readFileSync(new URL('../docs/data/periodo.json', import.meta.url)));
+const reportes = periodo.ocupacionesReportadas[datos.semestre];
+const horario = prepararHorario(datos, reportes);
 const consulta = (dia, hora) => ({ dia, desde: minutos(hora) });
 const estadoF411 = (dia, hora) => evaluarAulas(horario, consulta(dia, hora)).get('F411');
 
-test('las 53 aulas del semestre se encuentran por piso y conservan sus códigos', () => {
+test('el plano incluye las 53 aulas con clases publicadas y las 6 salas con horario por confirmar', () => {
   assert.equal(horario.aulas.length, 53);
-  assert.deepEqual([1, 2, 3, 4].map(piso => horario.aulas.filter(sala => sala.piso === piso).length), [27, 9, 5, 12]);
-  assert.equal(new Set(horario.aulas.map(sala => sala.codigo)).size, 53);
-  assert.deepEqual(horario.aulas.filter(sala => !POSICIONES[sala.codigo]).map(sala => sala.codigo), ['F406']);
+  assert.deepEqual([1, 2, 3, 4].map(piso => horario.salasMapa.filter(sala => sala.piso === piso).length), [29, 9, 5, 16]);
+  assert.equal(new Set(horario.salasMapa.map(sala => sala.codigo)).size, 59);
+  assert.deepEqual(horario.salasMapa.filter(sala => !POSICIONES[sala.codigo]).map(sala => sala.codigo), ['F406']);
   assert.match(horario.aulas.find(sala => sala.codigo === 'F406').notaUbicacion, /dos puntos del piso 4/);
-  assert.equal(Object.keys(POSICIONES).length, 52);
+  assert.equal(Object.keys(POSICIONES).length, 58);
   assert.equal(POSICIONES.F411[1], POSICIONES.F405[1]);
   assert.equal(POSICIONES.F411[1], POSICIONES.F402[1]);
   assert(POSICIONES.F405[0] < POSICIONES.F411[0] && POSICIONES.F411[0] < POSICIONES.F402[0]);
@@ -28,7 +30,7 @@ test('en el tamaño mínimo, los marcadores no se superponen ni salen del plano 
   for (const piso of [1, 2, 3, 4]) {
     for (const [edificio, vista] of [['', CAMPUS], ...Object.entries(SECTORES)]) {
       const escala = .74;
-      const marcadores = horario.aulas.filter(sala => sala.piso === piso && (!edificio || sala.edificio === edificio))
+      const marcadores = horario.salasMapa.filter(sala => sala.piso === piso && (!edificio || sala.edificio === edificio))
         .filter(sala => POSICIONES[sala.codigo]);
       for (const [i, sala] of marcadores.entries()) {
         const [x, y] = POSICIONES[sala.codigo];
@@ -122,6 +124,28 @@ test('las clases sin sala se cuentan por día y bloque sin asignarles un aula', 
   assert(!horario.porSala.has(null));
 });
 
+test('K402 muestra el reporte del lunes a las 17:30 y mantiene el término por confirmar', () => {
+  const durante = evaluarAulas(horario, consulta(0, '17:30'));
+  const ficha = durante.get('K402');
+  assert.equal(colorSala(ficha), 'ocupada');
+  assert.equal(ficha.reporte.sigla, 'FIS100');
+  assert.equal(ficha.hasta, undefined);
+  assert.equal(ficha.proximaLibre, undefined);
+  for (const codigo of ['A015', 'F401']) {
+    const publicado = durante.get(codigo);
+    assert.equal(colorSala(publicado), 'ocupada');
+    assert(publicado.enCurso.some(clase => clase.sigla === 'FIS100' && !clase.reportada));
+  }
+  for (const momento of [consulta(0, '17:14'), consulta(0, '18:05'), consulta(0, '20:00'), consulta(1, '17:30')]) {
+    const pendiente = evaluarAulas(horario, momento).get('K402');
+    assert.equal(colorSala(pendiente), 'sin-datos');
+    assert.equal(pendiente.sinHorarioDelDia, true);
+    assert(!buscarSalas(horario, momento).some(item => item.sala.codigo === 'K402'));
+  }
+  assert.equal(colorSala(evaluarAulas(horario, consulta(0, '12:30')).get('A008')), 'sin-datos');
+  assert.equal(colorSala(evaluarAulas(horario, consulta(1, '18:50')).get('A008')), 'ocupada');
+});
+
 test('ocupaciones simultáneas y contiguas aplazan el primer momento libre', () => {
   const sala = horario.aulas.find(aula => aula.codigo === 'F411');
   const clases = [
@@ -130,7 +154,7 @@ test('ocupaciones simultáneas y contiguas aplazan el primer momento libre', () 
     { desde: 600, hasta: 630 },
     { desde: 670, hasta: 705 },
   ];
-  const ejemplo = { ...horario, aulas: [sala], porSala: new Map([['F411', [clases]]]) };
+  const ejemplo = { ...horario, salasMapa: [sala], porSala: new Map([['F411', [clases]]]) };
   const ficha = evaluarAulas(ejemplo, { dia: 0, desde: 530 }).get('F411');
   assert.equal(ficha.enCurso.length, 2);
   assert.equal(ficha.hasta, 630);
@@ -141,7 +165,7 @@ test('un recreo entre clases no se ofrece como franja libre ni se suma al final 
   const sala = horario.aulas.find(aula => aula.codigo === 'F411');
   const clases = [['08:50', '09:25'], ['09:40', '10:15'], ['11:05', '11:40']]
     .map(([inicio, fin]) => ({ desde: minutos(inicio), hasta: minutos(fin) }));
-  const ejemplo = { ...horario, aulas: [sala], porSala: new Map([['F411', [clases]]]) };
+  const ejemplo = { ...horario, salasMapa: [sala], porSala: new Map([['F411', [clases]]]) };
   const ocupada = evaluarAulas(ejemplo, consulta(0, '09:15')).get('F411');
   assert.equal(ocupada.hasta, minutos('10:15'));
   assert.deepEqual(ocupada.proximaLibre, { desde: minutos('10:15'), hasta: minutos('10:50') });
@@ -150,6 +174,20 @@ test('un recreo entre clases no se ofrece como franja libre ni se suma al final 
   assert.equal(libre.hasta, minutos('10:50'));
   assert.equal(libre.minutos, 30);
   assert.equal(libre.siguienteHoy.desde, minutos('11:05'));
+});
+
+test('un reporte en un aula con horario limita la recomendación sin anticipar el término', () => {
+  const sala = horario.aulas.find(aula => aula.codigo === 'F411');
+  const clases = [
+    { desde: minutos('16:05'), hasta: minutos('17:15') },
+    { desde: minutos('17:30'), hasta: minutos('18:05'), reportada: true },
+  ];
+  const ejemplo = { ...horario, aulas: [sala], salasMapa: [sala], porSala: new Map([['F411', [clases]]]) };
+  const enCurso = evaluarAulas(ejemplo, consulta(0, '17:00')).get('F411');
+  assert.equal(enCurso.hasta, minutos('17:15'));
+  assert.equal(enCurso.proximaLibre, null);
+  assert.equal(buscarSalas(ejemplo, consulta(0, '18:10')).length, 0);
+  assert.equal(colorSala(evaluarAulas(ejemplo, consulta(0, '18:10')).get('F411')), 'sin-datos');
 });
 
 test('mapa y buscador coinciden para cada aula y cada minuto del horario semanal', () => {
@@ -181,13 +219,17 @@ test('mapa y buscador coinciden para cada aula y cada minuto del horario semanal
         const enCurso = sesiones.some(s => s.desde <= efectivo && efectivo < s.hasta);
         if (enCurso) {
           assert.equal(colorSala(ficha), 'ocupada');
-          assert(ficha.hasta > efectivo);
-          assert(!sesiones.some(s => s.desde <= ficha.hasta && ficha.hasta < s.hasta));
+          if (!ficha.reporte) {
+            assert(ficha.hasta > efectivo);
+            assert(!sesiones.some(s => s.desde <= ficha.hasta && ficha.hasta < s.hasta));
+          }
           if (ficha.proximaLibre) {
             const franja = ficha.proximaLibre;
             assert(!minutosRecreo.has(franja.desde) && !minutosRecreo.has(franja.hasta - 1));
             assert(!sesiones.some(s => s.desde < franja.hasta && s.hasta > franja.desde));
           }
+        } else if (!sesiones.length || ficha.sala.estado === 'solo_mapa') {
+          assert.equal(colorSala(ficha), 'sin-datos');
         } else {
           let hasta = sesiones.find(s => s.desde > efectivo)?.desde ?? cobertura.hasta;
           while (minutosRecreo.has(hasta - 1)) hasta -= 1;
@@ -202,5 +244,5 @@ test('mapa y buscador coinciden para cada aula y cada minuto del horario semanal
       }
     }
   }
-  assert.equal(verificados, 231875);
+  assert.equal(verificados, 258125);
 });

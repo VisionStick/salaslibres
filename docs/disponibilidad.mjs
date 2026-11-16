@@ -23,7 +23,7 @@ export function relojCampus(zonaHoraria, fecha = new Date()) {
 const ordenarCodigo = new Intl.Collator('es-CL', { numeric: true });
 const RECREO_MAXIMO = 15;
 
-export function prepararHorario(datos) {
+export function prepararHorario(datos, reportes = []) {
   const bloques = datos.bloques.map(bloque => ({
     ...bloque, desde: minutos(bloque.inicio), hasta: minutos(bloque.fin),
   }));
@@ -36,6 +36,8 @@ export function prepararHorario(datos) {
   });
   const cobertura = Array.from({ length: datos.dias.length }, () => null);
   const sinSala = Array.from({ length: datos.dias.length }, () => new Map());
+  const aulas = datos.salas.filter(sala => sala.estado === 'aula');
+  const salasMapa = datos.salas.filter(sala => sala.estado === 'aula' || sala.estado === 'solo_mapa');
   const porSala = new Map(datos.salas.map(sala => [
     sala.codigo, Array.from({ length: datos.dias.length }, () => []),
   ]));
@@ -83,12 +85,26 @@ export function prepararHorario(datos) {
     }
   }
 
+  for (const reporte of reportes) {
+    const bloque = bloques.find(item => item.numero === reporte.bloque);
+    const dia = reporte.dia;
+    const sesiones = porSala.get(reporte.sala)?.[dia];
+    if (!bloque || !sesiones || !salasMapa.some(sala => sala.codigo === reporte.sala)) {
+      throw new Error('Sala, día o bloque inválido en un reporte de ocupación');
+    }
+    sesiones.push({
+      desde: bloque.desde, hasta: bloque.hasta, dia, sigla: reporte.sigla, reportada: true,
+    });
+    cobertura[dia] ??= { desde: bloques[0].desde, hasta: 0 };
+    cobertura[dia].hasta = Math.max(cobertura[dia].hasta, bloque.hasta);
+  }
+
   for (const semana of porSala.values()) {
     for (const sesiones of semana) {
       sesiones.sort((a, b) => a.desde - b.desde || ordenarCodigo.compare(a.sigla, b.sigla));
     }
   }
-  return { bloques, recreos, cobertura, porSala, sinSala, aulas: datos.salas.filter(sala => sala.estado === 'aula') };
+  return { bloques, recreos, cobertura, porSala, sinSala, aulas, salasMapa };
 }
 
 function clasesQueEmpiezan(sesiones) {
@@ -151,21 +167,34 @@ function evaluarSala(horario, sala, dia, desde, cobertura) {
   const semana = horario.porSala.get(sala.codigo);
   const sesiones = semana[dia];
   const enCurso = sesiones.filter(sesion => sesion.desde <= desde && desde < sesion.hasta);
+  const reporte = enCurso.find(sesion => sesion.reportada);
+  if (reporte) return { sala, estado: 'ocupada', enCurso, reporte };
+
+  // El bloque de un reporte localiza el aviso. Su término real sigue sin confirmar.
+  const puedeSugerir = sala.estado === 'aula' && sesiones.some(sesion => !sesion.reportada)
+    && !sesiones.some(sesion => sesion.reportada && sesion.desde <= desde);
   if (enCurso.length) {
     let hasta = Math.max(...enCurso.map(sesion => sesion.hasta));
     let hastaLibre = cobertura.hasta;
     for (const sesion of sesiones) {
+      if (sesion.reportada) {
+        if (sesion.desde > desde) hastaLibre = Math.min(hastaLibre, sesion.desde);
+        continue;
+      }
       if (sesion.desde > siguienteMomentoUtil(horario, hasta)) {
-        hastaLibre = sesion.desde;
+        hastaLibre = Math.min(hastaLibre, sesion.desde);
         break;
       }
       hasta = Math.max(hasta, sesion.hasta);
     }
     const siguienteInicio = siguienteMomentoUtil(horario, hasta);
     hastaLibre = finDeFranja(horario, hastaLibre);
-    const proximaLibre = siguienteInicio < hastaLibre ? { desde: siguienteInicio, hasta: hastaLibre } : null;
+    const proximaLibre = puedeSugerir && siguienteInicio < hastaLibre
+      ? { desde: siguienteInicio, hasta: hastaLibre } : null;
     return { sala, estado: 'ocupada', hasta, enCurso, proximaLibre };
   }
+
+  if (!puedeSugerir) return { sala, estado: 'sin-datos', sinHorarioDelDia: true };
 
   const proxima = proximaClase(semana, dia, desde);
   const siguienteHoy = proxima.dias === 0 ? proxima.clases[0] : null;
@@ -185,7 +214,7 @@ function evaluarSala(horario, sala, dia, desde, cobertura) {
 export function evaluarAulas(horario, consulta, vigente = true) {
   const { dia, desde } = resolverConsulta(horario, consulta);
   const cobertura = vigente ? coberturaConsulta(horario, { dia, desde }) : null;
-  return new Map(horario.aulas.map(sala => [sala.codigo, cobertura
+  return new Map(horario.salasMapa.map(sala => [sala.codigo, cobertura
     ? evaluarSala(horario, sala, dia, desde, cobertura)
     : { sala, estado: 'sin-datos' }]));
 }

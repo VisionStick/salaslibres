@@ -82,7 +82,7 @@
           </select>
         </div>
       </div>
-      <p class="nota-horario" id="nota-horario" hidden>Las reservas, los cambios del día y el uso por estudiantes pueden ocupar una sala. <span id="fecha-horario"></span></p>
+      <p class="nota-horario" id="nota-horario" hidden>Las salas con horario por confirmar se ven en el mapa. Las reservas y el uso por otras personas pueden ocupar una sala. <span id="fecha-horario"></span></p>
       <p class="subtitulo aviso-consulta" id="aviso-consulta" role="status" hidden></p>
       <div class="filtros" id="filtros" hidden>
         <div class="edificios" id="edificios" role="group" aria-label="Filtrar por edificio"></div>
@@ -156,14 +156,14 @@
       </div>
       <div class="mapa-estados">
         <ul class="mapa-leyenda" aria-label="Estados de disponibilidad">
-          <li class="mapa-estado" data-color="ocupada"><span aria-hidden="true">×</span> Con clase</li>
+          <li class="mapa-estado" data-color="ocupada"><span aria-hidden="true">×</span> Clase o uso reportado</li>
           <li class="mapa-estado" data-color="corta"><span aria-hidden="true">−</span> Hasta 2 bloques</li>
           <li class="mapa-estado" data-color="larga"><span aria-hidden="true">+</span> Más de 2 bloques</li>
-          <li class="mapa-estado mapa-leyenda-sin-datos" data-color="sin-datos" hidden><span aria-hidden="true">·</span> Sin horario</li>
+          <li class="mapa-estado mapa-leyenda-sin-datos" data-color="sin-datos"><span aria-hidden="true">·</span> Por confirmar</li>
         </ul>
         <p class="mapa-momento" role="status"></p>
       </div>
-      <p class="nota-mapa nota-mapa-consulta">Colores según las clases publicadas. Puede haber reservas o personas usando la sala.</p>
+      <p class="nota-mapa nota-mapa-consulta">El mapa usa el horario de clases y los reportes incorporados. Puede haber reservas o personas usando la sala.</p>
       <p class="mapa-aviso" role="status" hidden></p>
       <div class="mapa-cuerpo">
         <div class="mapa-plano">
@@ -194,7 +194,7 @@
             <p class="mapa-detalle-duracion"></p>
             <p class="mapa-detalle-clase"></p>
             <details class="mapa-horario" hidden>
-              <summary>Clases publicadas del día</summary>
+              <summary>Horario y reportes del día</summary>
               <ul class="mapa-horario-clases"></ul>
             </details>
           </div>
@@ -211,7 +211,7 @@
         <ul class="lista-datos" id="lista-revision"></ul>
       </details>
       <details id="solo-mapa">
-        <summary>Salas que figuran solo en el mapa</summary>
+        <summary>Salas sin horario publicado</summary>
         <ul class="lista-datos" id="lista-mapa"></ul>
       </details>
     </details>

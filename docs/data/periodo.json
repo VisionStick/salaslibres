@@ -2,5 +2,10 @@
   "semestre": "2026-2",
   "inicioDiurno": "2026-08-03",
   "finDiurno": "2026-12-04",
-  "calendario": "https://dee.usm.cl/calendario-academico-estudiantes/"
+  "calendario": "https://dee.usm.cl/calendario-academico-estudiantes/",
+  "ocupacionesReportadas": {
+    "2026-2": [
+      {"sala": "K402", "dia": 0, "bloque": 13, "sigla": "FIS100", "fechaReporte": "2026-11-16"}
+    ]
+  }
 }
