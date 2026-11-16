@@ -168,6 +168,7 @@ select { padding-right: 26px; }
 .resultados-cabecera { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; }
 h2 { font-size: clamp(24px, 4vw, 34px); line-height: 1.1; font-weight: 780; letter-spacing: -.05em; }
 .subtitulo { color: var(--texto-secundario); margin-top: 5px; font-size: 14px; }
+.nota-horario { color: var(--texto-secundario); margin-top: 8px; font-size: 13px; line-height: 1.45; }
 .aviso-consulta { margin-top: 9px; color: var(--verde); }
 .orden { display: flex; gap: 8px; align-items: center; white-space: nowrap; }
 .orden label, .origen label { color: var(--texto-secundario); }

@@ -21,7 +21,7 @@ export function relojCampus(zonaHoraria, fecha = new Date()) {
 }
 
 const ordenarCodigo = new Intl.Collator('es-CL', { numeric: true });
-const RECREO_MINUTOS = 15;
+const RECREO_MAXIMO = 15;
 
 export function prepararHorario(datos) {
   const bloques = datos.bloques.map(bloque => ({
@@ -29,12 +29,13 @@ export function prepararHorario(datos) {
   }));
   const recreos = bloques.slice(1).flatMap((siguiente, i) => {
     const anterior = bloques[i];
-    // El intervalo largo de almuerzo tiene tratamiento propio en la consulta.
-    return siguiente.desde - anterior.hasta === RECREO_MINUTOS
+    const pausa = siguiente.desde - anterior.hasta;
+    return pausa > 0 && pausa <= RECREO_MAXIMO
       ? [{ desde: anterior.hasta, hasta: siguiente.desde, bloque: siguiente.numero }]
       : [];
   });
   const cobertura = Array.from({ length: datos.dias.length }, () => null);
+  const sinSala = Array.from({ length: datos.dias.length }, () => new Map());
   const porSala = new Map(datos.salas.map(sala => [
     sala.codigo, Array.from({ length: datos.dias.length }, () => []),
   ]));
@@ -44,7 +45,13 @@ export function prepararHorario(datos) {
       for (const paralelo of ramo.paralelos) {
         const clases = new Map();
         for (const fila of paralelo.horario) {
-          if (!fila.enSanJoaquin || !porSala.has(fila.sala)) continue;
+          if (!fila.enSanJoaquin) continue;
+          if (!fila.sala) {
+            const porBloque = sinSala[fila.dia];
+            porBloque.set(fila.bloque, (porBloque.get(fila.bloque) ?? 0) + 1);
+            continue;
+          }
+          if (!porSala.has(fila.sala)) continue;
           const clave = JSON.stringify([fila.sala, fila.dia, fila.tipo, fila.profesor]);
           if (!clases.has(clave)) clases.set(clave, []);
           clases.get(clave).push(fila);
@@ -57,7 +64,7 @@ export function prepararHorario(datos) {
           for (const fila of clase.sort((a, b) => a.bloque - b.bloque)) {
             const desde = minutos(fila.inicio);
             const hasta = minutos(fila.fin);
-            if (sesion && fila.bloque <= sesion.ultimoBloque + 1 && desde - sesion.hasta <= RECREO_MINUTOS) {
+            if (sesion && fila.bloque <= sesion.ultimoBloque + 1 && desde - sesion.hasta <= RECREO_MAXIMO) {
               sesion.hasta = Math.max(sesion.hasta, hasta);
               sesion.ultimoBloque = Math.max(sesion.ultimoBloque, fila.bloque);
             } else {
@@ -81,7 +88,7 @@ export function prepararHorario(datos) {
       sesiones.sort((a, b) => a.desde - b.desde || ordenarCodigo.compare(a.sigla, b.sigla));
     }
   }
-  return { bloques, recreos, cobertura, porSala, aulas: datos.salas.filter(sala => sala.estado === 'aula') };
+  return { bloques, recreos, cobertura, porSala, sinSala, aulas: datos.salas.filter(sala => sala.estado === 'aula') };
 }
 
 function clasesQueEmpiezan(sesiones) {

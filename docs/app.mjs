@@ -19,7 +19,7 @@ let mapa;
 
 const numero = new Intl.NumberFormat('es-CL', { useGrouping: 'always' });
 const fechaLocal = new Intl.DateTimeFormat('es-CL', {
-  timeZone: 'America/Santiago', dateStyle: 'medium',
+  timeZone: 'America/Santiago', dateStyle: 'medium', timeStyle: 'short', hourCycle: 'h23',
 });
 
 function texto(etiqueta, contenido, clase) {
@@ -126,6 +126,8 @@ function escribirConsulta(form, consulta) {
 function describirDatos() {
   const info = datos.validacion;
   const actualizado = fechaLocal.format(new Date(datos.fuente.actualizado));
+  id('fecha-horario').textContent = 'Datos de Horario USM del ' + actualizado + '.';
+  id('nota-horario').hidden = false;
   id('datos-semestre').append(
     texto('p', 'Semestre ' + datos.semestre + ' · Horario del ' + actualizado),
     texto('p', numero.format(info.ramos) + ' ramos · ' + numero.format(info.paralelos) + ' paralelos · ' + info.aulasConsultables + ' aulas consultables.'),
@@ -139,6 +141,13 @@ function describirDatos() {
   calendario.target = '_blank';
   calendario.rel = 'noopener noreferrer';
   id('datos-semestre').append(descarga, calendario);
+  if (datos.fuente.tablaBloques) {
+    const guia = texto('a', 'Ver los bloques oficiales en la guía USM ↗');
+    guia.href = datos.fuente.tablaBloques;
+    guia.target = '_blank';
+    guia.rel = 'noopener noreferrer';
+    id('datos-semestre').append(guia);
+  }
 
   id('revision').querySelector('summary').textContent = 'Espacios por revisar (' + info.espaciosPorRevisar + ')';
   id('solo-mapa').querySelector('summary').textContent = 'Salas que figuran solo en el mapa (' + info.espaciosSoloMapa + ')';
@@ -180,7 +189,7 @@ function escribirClase(tarjeta, ficha, fechaConsulta) {
   }
 }
 
-function tarjetaSala(ficha, fechaConsulta) {
+function tarjetaSala(ficha, diaConsulta, fechaConsulta) {
   const tarjeta = id('plantilla-sala').content.firstElementChild.cloneNode(true);
   const { sala, libreDesde, hasta, completos } = ficha;
   const piso = sala.piso == null ? '' : ' · Piso ' + sala.piso;
@@ -194,7 +203,9 @@ function tarjetaSala(ficha, fechaConsulta) {
   }
 
   const etiqueta = tarjeta.querySelector('.conveniencia');
-  const nivel = completos >= 3 ? 'Muy conveniente' : completos === 2 ? 'Disponible' : 'Poco tiempo';
+  const sinClasesDia = !horario.porSala.get(sala.codigo)[diaConsulta].length;
+  const nivel = completos >= 3 ? 'Muy conveniente' : completos === 2 ? 'Tiempo acotado' : 'Poco tiempo';
+  etiqueta.hidden = sinClasesDia;
   if (completos < 3) etiqueta.classList.add('media');
   etiqueta.lastElementChild.textContent = nivel;
 
@@ -203,7 +214,9 @@ function tarjetaSala(ficha, fechaConsulta) {
     tiempos[i].dateTime = hhmm(tiempo);
     tiempos[i].textContent = hhmm(tiempo);
   }
-  if (!ficha.siguienteHoy) tarjeta.querySelector('.franja-etiqueta').textContent = 'Hasta el fin del horario registrado';
+  const franja = tarjeta.querySelector('.franja-etiqueta');
+  if (sinClasesDia) franja.textContent = 'Sin clases registradas ese día';
+  else if (!ficha.siguienteHoy) franja.textContent = 'Hasta el fin del horario registrado';
 
   const bloques = completos === 1 ? '1 bloque completo' : completos + ' bloques completos';
   tarjeta.querySelector('.sala-tiempo').textContent = 'Te quedan ' + textoDuracion(ficha.minutos) + ' sin recreos · ' + bloques;
@@ -226,20 +239,24 @@ function mostrar() {
     : !cobertura ? 'No hay horarios con sala registrada para este día.'
     : !enHorario ? 'Horario registrado de ' + hhmm(cobertura.desde) + ' a ' + hhmm(cobertura.hasta) + '.'
     : '';
-  const bloque = horario.bloques.find(bloque => bloque.desde === desde);
-  const momento = [fecha ? 'Ahora' : '', datos.dias[diaConsulta], bloque ? 'Bloque ' + bloque.numero : '', hhmm(desde)]
+  const bloque = bloqueEn(desde);
+  const momento = [fecha && !bloqueRecreo ? 'Ahora' : '', datos.dias[diaConsulta], bloque ? 'Bloque ' + bloque.numero : '', hhmm(desde)]
     .filter(Boolean).join(' · ');
   const contexto = momento + (estado.edificio ? ' · Edificio ' + estado.edificio : '');
   const avisoRecreo = bloqueRecreo ? 'A las ' + hhmm(horaConsultada) + ' hay recreo. Se muestra el bloque '
     + bloqueRecreo + ', que empieza a las ' + hhmm(desde) + '.' : '';
-  id('aviso-consulta').textContent = enHorario ? avisoRecreo : '';
-  id('aviso-consulta').hidden = !enHorario || !avisoRecreo;
+  const sinSala = horario.sinSala[diaConsulta].get(bloque?.numero) ?? 0;
+  const avisoSinSala = sinSala === 1 ? 'La fuente registra una clase sin sala publicada en este bloque.'
+    : sinSala > 1 ? 'La fuente registra ' + sinSala + ' clases sin sala publicada en este bloque.' : '';
+  const aviso = [avisoRecreo, avisoSinSala].filter(Boolean).join(' ');
+  id('aviso-consulta').textContent = enHorario ? aviso : '';
+  id('aviso-consulta').hidden = !enHorario || !aviso;
   id('salas').replaceChildren();
   id('pie-resultados').hidden = true;
   id('campo-origen').hidden = orden.value !== 'cercania';
 
   if (dialogoMapa.open) {
-    mapa.actualizar(estado.consulta, enHorario, momento, avisoMapa || avisoRecreo);
+    mapa.actualizar(estado.consulta, enHorario, momento, avisoMapa || aviso);
   }
 
   if (!enHorario) {
@@ -261,15 +278,15 @@ function mostrar() {
   if (!cantidad) {
     const alternativa = minimo > 0 && buscarSalas(horario, { ...seleccion, minimo: 0 }).length > 0;
     mensaje(
-      alternativa ? 'Ninguna sala alcanza esa duración.' : 'No hay salas disponibles para esa búsqueda.',
-      alternativa ? 'Hay salas libres durante menos tiempo.' : 'Prueba con otro día, bloque, hora o edificio.',
+      alternativa ? 'Ninguna franja sin clases alcanza esa duración.' : 'No hay salas sin clase programada para esa búsqueda.',
+      alternativa ? 'Hay salas sin clases durante menos tiempo.' : 'Prueba con otro día, bloque, hora o edificio.',
       alternativa,
     );
     return;
   }
 
   mensaje('', '');
-  id('salas').append(...opciones.slice(0, estado.limite).map(ficha => tarjetaSala(ficha, fecha)));
+  id('salas').append(...opciones.slice(0, estado.limite).map(ficha => tarjetaSala(ficha, diaConsulta, fecha)));
   const restantes = cantidad - estado.limite;
   id('pie-resultados').hidden = restantes <= 0;
   id('mas').textContent = 'Mostrar más salas (' + Math.max(0, restantes) + ')';

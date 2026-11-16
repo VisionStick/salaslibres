@@ -31,8 +31,8 @@
       <div class="portada-texto">
         <p class="campus"><span aria-hidden="true"></span> USM · Santiago San Joaquín</p>
         <h1 id="titulo">Encuentra una sala<br class="salto-titulo"> para estudiar.</h1>
-        <p class="intro">Revisa qué salas están libres y cuánto tiempo tienes antes de la siguiente clase.</p>
-        <button type="button" class="boton ahora" id="ahora" disabled><span class="icono-reloj" aria-hidden="true"></span> Buscar salas libres ahora</button>
+        <p class="intro">Busca salas sin clases programadas y revisa cuándo empieza la siguiente clase.</p>
+        <button type="button" class="boton ahora" id="ahora" disabled><span class="icono-reloj" aria-hidden="true"></span> Consultar salas ahora</button>
       </div>
       <button type="button" class="portada-mapa" id="abrir-mapa-portada" aria-haspopup="dialog" aria-controls="dialogo-datos" disabled>
         <canvas id="mapa-portada" aria-hidden="true"></canvas>
@@ -70,7 +70,7 @@
     <section class="resultados" id="resultados" aria-labelledby="titulo-resultados">
       <div class="resultados-cabecera">
         <div>
-          <h2 id="titulo-resultados">Salas disponibles</h2>
+          <h2 id="titulo-resultados">Salas sin clase programada</h2>
           <p class="subtitulo" id="resumen" role="status" aria-live="polite">Cargando el horario del semestre…</p>
         </div>
         <div class="orden">
@@ -82,6 +82,7 @@
           </select>
         </div>
       </div>
+      <p class="nota-horario" id="nota-horario" hidden>Las reservas, los cambios del día y el uso por estudiantes pueden ocupar una sala. <span id="fecha-horario"></span></p>
       <p class="subtitulo aviso-consulta" id="aviso-consulta" role="status" hidden></p>
       <div class="filtros" id="filtros" hidden>
         <div class="edificios" id="edificios" role="group" aria-label="Filtrar por edificio"></div>
@@ -104,7 +105,6 @@
     </section>
 
     <footer class="pie">
-      <span>Disponibilidad según el horario publicado. El acceso, las reservas y los cambios del día pueden variar.</span>
       <a href="https://alviniscrack.github.io/horario-usm/" target="_blank" rel="noopener noreferrer">Fuente: Horario USM ↗</a>
     </footer>
     <noscript><p class="mensaje">Activa JavaScript para consultar el horario y buscar salas.</p></noscript>
@@ -156,13 +156,14 @@
       </div>
       <div class="mapa-estados">
         <ul class="mapa-leyenda" aria-label="Estados de disponibilidad">
-          <li class="mapa-estado" data-color="ocupada"><span aria-hidden="true">×</span> Ocupada</li>
+          <li class="mapa-estado" data-color="ocupada"><span aria-hidden="true">×</span> Con clase</li>
           <li class="mapa-estado" data-color="corta"><span aria-hidden="true">−</span> Hasta 2 bloques</li>
           <li class="mapa-estado" data-color="larga"><span aria-hidden="true">+</span> Más de 2 bloques</li>
           <li class="mapa-estado mapa-leyenda-sin-datos" data-color="sin-datos" hidden><span aria-hidden="true">·</span> Sin horario</li>
         </ul>
         <p class="mapa-momento" role="status"></p>
       </div>
+      <p class="nota-mapa nota-mapa-consulta">Colores según las clases publicadas. Puede haber reservas o personas usando la sala.</p>
       <p class="mapa-aviso" role="status" hidden></p>
       <div class="mapa-cuerpo">
         <div class="mapa-plano">
@@ -182,7 +183,7 @@
           <div class="mapa-detalle-vacio">
             <p class="mapa-total"></p>
             <h3>Explora las salas</h3>
-            <p>Selecciona una sala para ver su intervalo disponible y la próxima clase.</p>
+            <p>Selecciona una sala para ver las clases del día y los intervalos entre ellas.</p>
           </div>
           <div class="mapa-detalle-ficha" hidden>
             <p class="mapa-detalle-ubicacion"></p>
@@ -192,10 +193,14 @@
             <p class="mapa-detalle-tramo"></p>
             <p class="mapa-detalle-duracion"></p>
             <p class="mapa-detalle-clase"></p>
+            <details class="mapa-horario" hidden>
+              <summary>Clases publicadas del día</summary>
+              <ul class="mapa-horario-clases"></ul>
+            </details>
           </div>
         </aside>
       </div>
-      <p class="nota-mapa">Plano esquemático basado en «Soy el mapa». Los estados se calculan según los bloques completos disponibles, con los recreos de 15 minutos descontados.</p>
+      <p class="nota-mapa">Plano esquemático basado en «Soy el mapa». Se cuentan los bloques completos sin clase y se descuentan los recreos de 10 y 15 minutos.</p>
       <p class="nota-mapa mapa-minimo" hidden>La duración mínima se aplica al listado de resultados.</p>
     </section>
     <details class="mapa-fuentes">

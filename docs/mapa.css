@@ -124,6 +124,7 @@
   color: var(--tinta);
   font-size: 13px;
 }
+.mapa-dialogo .nota-mapa-consulta { margin: 0 0 8px; }
 
 .mapa-cuerpo {
   display: grid;
@@ -210,6 +211,9 @@
 .mapa-detalle-tramo { margin-top: 9px; font-size: 15px; font-weight: 780; }
 .mapa-detalle-duracion, .mapa-detalle-clase { margin-top: 5px; color: var(--texto-secundario); font-size: 13px; line-height: 1.4; }
 .mapa-detalle-clase:not(:empty) { margin-top: 9px; padding-top: 7px; border-top: 1px solid var(--borde); }
+.mapa-horario-clases { list-style: none; padding: 0; margin: 8px 0 0; }
+.mapa-horario-clases li { display: grid; gap: 2px; padding: 5px 0; color: var(--texto-secundario); font-size: 12px; line-height: 1.35; }
+.mapa-horario-clases li + li { border-top: 1px solid var(--borde); }
 .mapa-fuentes { margin-top: 12px; }
 @keyframes aparecer-sala { from { opacity: .55; } to { opacity: 1; } }
 

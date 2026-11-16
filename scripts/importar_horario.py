@@ -16,6 +16,7 @@ from urllib.request import urlopen
 DATOS = Path(__file__).resolve().parents[1] / "docs" / "data"
 REPO = "https://github.com/AlvinIsCrack/horario-usm"
 WEB = "https://alviniscrack.github.io/horario-usm/"
+GUIA_BLOQUES = "https://dee.usm.cl/wp-content/uploads/2025/12/2026-Gui%CC%81a-de-Estudiante-.pdf"
 RUTA_FUENTE = "src/lib/data"
 CODIGO = re.compile(r"-?((?:KS|[A-Z])\d{3}[A-Z]?)(?:[- ]*(?:SAN JOAQUIN|SJ)(?:\s+(?:A|HA))?)?")
 MARCA_SJ = re.compile(r"\bSAN JOAQUIN\b|(?:^|[-\s])SJ(?:\s|$)")
@@ -34,19 +35,22 @@ def texto_busqueda(texto):
     ).strip()
 
 
-def hora(minutos):
-    return f"{minutos // 60:02}:{minutos % 60:02}"
-
-
 def tabla_bloques():
-    # Correspondencia de constants/usm.ts y helpers/time.ts de Horario USM.
-    bloques = {}
-    for n in range(1, 21):
-        inicio = 8 * 60 + 15 + 35 * (n - 1) + 15 * ((n - 1) // 2)
-        if n > 8:
-            inicio += 45
-        bloques[n] = {"numero": n, "inicio": hora(inicio), "fin": hora(inicio + 35)}
-    return bloques
+    # Guía de Estudiante USM 2026, «Bloques y horarios de clases».
+    tramos = (
+        ("08:15", "08:50"), ("08:50", "09:25"),
+        ("09:40", "10:15"), ("10:15", "10:50"),
+        ("11:05", "11:40"), ("11:40", "12:15"),
+        ("12:30", "13:05"), ("13:05", "13:40"),
+        ("14:40", "15:15"), ("15:15", "15:50"),
+        ("16:05", "16:40"), ("16:40", "17:15"),
+        ("17:30", "18:05"), ("18:05", "18:40"),
+        ("18:50", "19:25"), ("19:25", "20:00"),
+        ("20:15", "20:50"), ("20:50", "21:25"),
+        ("21:40", "22:15"), ("22:15", "22:50"),
+    )
+    return {n: {"numero": n, "inicio": inicio, "fin": fin}
+            for n, (inicio, fin) in enumerate(tramos, 1)}
 
 
 def archivo_fuente(archivo, revision, repo_local):
@@ -62,7 +66,7 @@ def archivo_fuente(archivo, revision, repo_local):
 
 def sala_normalizada(nombre, alias):
     texto = texto_busqueda(nombre)
-    if texto in ("", "SIN SALA", "SIN INFORMACION", "POR ASIGNAR"):
+    if texto in ("", "SIN SALA", "SIN INFORMACION", "POR ASIGNAR", "POR DEFINIR"):
         return None
     if texto in alias:
         return alias[texto]
@@ -283,6 +287,7 @@ def main():
     datos["fuente"] = {
         "sitio": WEB, "revision": args.revision,
         "archivo": f"{REPO}/blob/{args.revision}/{RUTA_FUENTE}/horario_asignaturas.json",
+        "tablaBloques": GUIA_BLOQUES,
         "actualizado": datetime.fromtimestamp(metadata["generatedAt"]["unix"], timezone.utc).isoformat(),
         "sha256": hashlib.sha256(raw).hexdigest()
     }

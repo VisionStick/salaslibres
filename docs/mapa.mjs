@@ -2,7 +2,7 @@ import { contarBloques, evaluarAulas, hhmm, proximaClaseEnPeriodo } from './disp
 import { CAMPUS, dibujarCampus, POSICIONES, SECTORES } from './plano-campus.mjs';
 
 const ESTADOS = {
-  ocupada: { titulo: 'Ocupada', icono: '×' },
+  ocupada: { titulo: 'Con clase programada', icono: '×' },
   corta: { titulo: 'Hasta 2 bloques', icono: '−' },
   larga: { titulo: 'Más de 2 bloques', icono: '+' },
   'sin-datos': { titulo: 'Sin horario para esta consulta', icono: '·' },
@@ -56,6 +56,7 @@ export function crearMapa(raiz, datos, horario, periodo) {
   const pendientes = buscar('.mapa-pendientes');
   const pendientesBotones = buscar('.mapa-pendientes-salas');
   const detalle = buscar('.mapa-detalle');
+  const horarioSala = buscar('.mapa-horario');
   const mini = matchMedia('(max-width: 640px)');
   const detalleAbajo = matchMedia('(max-width: 850px)');
   const niveles = [...new Set(horario.aulas.map(sala => sala.piso))].sort((a, b) => a - b);
@@ -71,6 +72,7 @@ export function crearMapa(raiz, datos, horario, periodo) {
   let vista = CAMPUS;
   let activos = new Set();
   let claveConsulta;
+  let sesionesMostradas;
 
   function actualizarDetalle(codigo) {
     const ficha = estados.get(codigo);
@@ -79,11 +81,25 @@ export function crearMapa(raiz, datos, horario, periodo) {
     if (!ficha) return;
 
     const { sala } = ficha;
+    const sesiones = ficha.estado === 'sin-datos' ? [] : horario.porSala.get(codigo)[consultaActual.dia];
+    if (sesionesMostradas !== sesiones) {
+      sesionesMostradas = sesiones;
+      horarioSala.open = false;
+      horarioSala.hidden = !sesiones.length;
+      horarioSala.querySelector('ul').replaceChildren(...sesiones.map(clase => {
+        const fila = elemento('li', '');
+        fila.append(
+          elemento('strong', '', hhmm(clase.desde) + ' – ' + hhmm(clase.hasta)),
+          elemento('span', '', clase.sigla + ' P' + clase.paralelo + ' · ' + clase.nombre),
+        );
+        return fila;
+      }));
+    }
     const color = colorSala(ficha);
     const etiqueta = detalle.querySelector('.mapa-estado');
     etiqueta.dataset.color = color;
     etiqueta.firstElementChild.textContent = ESTADOS[color].icono;
-    etiqueta.lastElementChild.textContent = ficha.estado === 'libre' ? 'Disponible' : ESTADOS[color].titulo;
+    etiqueta.lastElementChild.textContent = ficha.estado === 'libre' ? 'Sin clase programada' : ESTADOS[color].titulo;
     buscar('.mapa-detalle-codigo').textContent = sala.codigo;
     buscar('.mapa-detalle-ubicacion').textContent = 'Edificio ' + sala.edificio + ' · Piso ' + sala.piso;
     const referencia = buscar('.mapa-detalle-referencia');
@@ -97,7 +113,7 @@ export function crearMapa(raiz, datos, horario, periodo) {
     duracionSala.textContent = '';
     siguiente.textContent = '';
     if (ficha.estado === 'libre') {
-      tramo.textContent = 'Libre de ' + hhmm(ficha.libreDesde) + ' a ' + hhmm(ficha.hasta);
+      tramo.textContent = 'Sin clase de ' + hhmm(ficha.libreDesde) + ' a ' + hhmm(ficha.hasta);
       duracionSala.textContent = descripcionBloques(ficha.completos) + ' · quedan ' + duracion(ficha.minutos) + ' sin recreos';
       const [clase] = proximaClaseEnPeriodo(ficha, consultaActual?.fecha, periodo.finDiurno);
       const salto = ficha.proxima.dias;
@@ -107,14 +123,15 @@ export function crearMapa(raiz, datos, horario, periodo) {
       } else {
         siguiente.textContent = 'Sin otra clase programada';
       }
-      if (!ficha.siguienteHoy) siguiente.textContent += ' · Franja hasta el fin del horario registrado';
+      if (!sesiones.length) siguiente.textContent += ' · Sin clases registradas ese día';
+      else if (!ficha.siguienteHoy) siguiente.textContent += ' · Franja hasta el fin del horario registrado';
     } else if (ficha.estado === 'ocupada') {
-      tramo.textContent = 'Ocupada hasta las ' + hhmm(ficha.hasta);
+      tramo.textContent = 'Con clases hasta las ' + hhmm(ficha.hasta);
       siguiente.textContent = ficha.enCurso.map(clase => clase.nombre).join(' · ');
       if (ficha.proximaLibre) {
         const { desde, hasta } = ficha.proximaLibre;
         const bloques = contarBloques(horario.bloques, desde, hasta);
-        duracionSala.textContent = 'Luego libre de ' + hhmm(desde) + ' a ' + hhmm(hasta) + ' · ' + descripcionBloques(bloques);
+        duracionSala.textContent = 'Luego sin clase de ' + hhmm(desde) + ' a ' + hhmm(hasta) + ' · ' + descripcionBloques(bloques);
       }
     } else {
       tramo.textContent = 'Consulta otro día, hora o bloque para ver la disponibilidad.';
@@ -129,7 +146,7 @@ export function crearMapa(raiz, datos, horario, periodo) {
       boton.dataset.color = color;
       boton.lastElementChild.textContent = marca.icono;
       boton.setAttribute('aria-pressed', String(codigo === seleccion));
-      const textoEstado = ficha?.estado === 'libre' ? 'Disponible · ' + descripcionBloques(ficha.completos) : marca.titulo;
+      const textoEstado = ficha?.estado === 'libre' ? 'Sin clase programada · ' + descripcionBloques(ficha.completos) : marca.titulo;
       boton.setAttribute('aria-label', codigo + ', ' + textoEstado);
     }
     actualizarDetalle(vistaPrevia || seleccion);

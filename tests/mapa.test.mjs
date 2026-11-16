@@ -58,7 +58,7 @@ test('F411 pasa de amarillo a rojo y a verde en el límite exacto del horario', 
   const ocupada = estadoF411(1, '14:40');
   assert.equal(colorSala(ocupada), 'ocupada');
   assert.equal(ocupada.hasta, minutos('15:50'));
-  assert.deepEqual(ocupada.proximaLibre, { desde: minutos('16:05'), hasta: minutos('22:55') });
+  assert.deepEqual(ocupada.proximaLibre, { desde: minutos('16:05'), hasta: minutos('22:50') });
   assert.equal(colorSala(estadoF411(1, '15:49')), 'ocupada');
   assert.equal(colorSala(estadoF411(1, '15:50')), 'larga');
   assert.equal(estadoF411(1, '15:50').completos, 10);
@@ -84,7 +84,7 @@ test('el recreo de 09:25 a 09:40 consulta las mismas salas que el bloque 3', () 
 });
 
 test('fin de semana, fuera de horario y fuera de semestre no marcan disponibilidad', () => {
-  for (const momento of [consulta(5, '11:05'), consulta(6, '11:05'), consulta(0, '08:14'), consulta(0, '22:55'), consulta(0, '')]) {
+  for (const momento of [consulta(5, '11:05'), consulta(6, '11:05'), consulta(0, '08:14'), consulta(0, '22:50'), consulta(0, '')]) {
     assert.equal(coberturaConsulta(horario, momento), null);
     assert([...evaluarAulas(horario, momento).values()].every(ficha => colorSala(ficha) === 'sin-datos'));
     assert.deepEqual(buscarSalas(horario, momento), []);
@@ -93,6 +93,33 @@ test('fin de semana, fuera de horario y fuera de semestre no marcan disponibilid
   const viernes = estadoF411(4, '17:15');
   assert.equal(proximaClaseEnPeriodo(viernes, '2026-12-04', '2026-12-04').length, 0);
   assert.equal(proximaClaseEnPeriodo(viernes, '2026-11-20', '2026-12-04')[0].dia, 0);
+});
+
+test('los bloques vespertinos siguen la guía oficial y excluyen las pausas de 10 minutos', () => {
+  assert.deepEqual(datos.bloques.slice(14).map(bloque => [bloque.inicio, bloque.fin]), [
+    ['18:50', '19:25'], ['19:25', '20:00'], ['20:15', '20:50'],
+    ['20:50', '21:25'], ['21:40', '22:15'], ['22:15', '22:50'],
+  ]);
+  for (const [inicioRecreo, finRecreo, bloque] of [['18:40', '18:50', 15], ['21:25', '21:40', 19]]) {
+    const momento = consulta(0, inicioRecreo);
+    assert.deepEqual(resolverConsulta(horario, momento), {
+      ...consulta(0, finRecreo), horaConsultada: momento.desde, bloqueRecreo: bloque,
+    });
+    assert.deepEqual(evaluarAulas(horario, momento), evaluarAulas(horario, consulta(0, finRecreo)));
+  }
+  const cambio = evaluarAulas(horario, consulta(3, '20:50')).get('A013');
+  assert.equal(colorSala(cambio), 'ocupada');
+  assert.equal(cambio.enCurso[0].sigla, 'RES010-B');
+  assert(!buscarSalas(horario, consulta(3, '20:50')).some(ficha => ficha.sala.codigo === 'A013'));
+});
+
+test('las clases sin sala se cuentan por día y bloque sin asignarles un aula', () => {
+  const total = horario.sinSala.flatMap(dia => [...dia.values()]).reduce((suma, count) => suma + count, 0);
+  assert.equal(total, datos.validacion.bloquesSinSalaEnSanJoaquin);
+  assert.equal(horario.sinSala[0].size, 0);
+  assert.equal(horario.sinSala[1].get(5), 1);
+  assert.equal(horario.sinSala[1].get(8), undefined);
+  assert(!horario.porSala.has(null));
 });
 
 test('ocupaciones simultáneas y contiguas aplazan el primer momento libre', () => {
@@ -130,7 +157,7 @@ test('mapa y buscador coinciden para cada aula y cada minuto del horario semanal
   for (const [i, bloque] of datos.bloques.slice(1).entries()) {
     const finAnterior = minutos(datos.bloques[i].fin);
     const siguiente = minutos(bloque.inicio);
-    if (siguiente - finAnterior === 15) {
+    if ([10, 15].includes(siguiente - finAnterior)) {
       for (let minuto = finAnterior; minuto < siguiente; minuto += 1) minutosRecreo.add(minuto);
     }
   }
@@ -175,5 +202,5 @@ test('mapa y buscador coinciden para cada aula y cada minuto del horario semanal
       }
     }
   }
-  assert.equal(verificados, 233200);
+  assert.equal(verificados, 231875);
 });
